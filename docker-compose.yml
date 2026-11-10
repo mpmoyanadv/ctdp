@@ -1,24 +1,24 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: capitec-dispute-postgres
+    container_name: capi-dispute-postgres
     environment:
-      POSTGRES_DB: capitec_disputes
-      POSTGRES_USER: capitec
-      POSTGRES_PASSWORD: capitec_secret
+      POSTGRES_DB: capi_disputes
+      POSTGRES_USER: capi
+      POSTGRES_PASSWORD: capi_secret
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U capitec -d capitec_disputes"]
+      test: ["CMD-SHELL", "pg_isready -U capi -d capi_disputes"]
       interval: 5s
       timeout: 5s
       retries: 12
 
   redis:
     image: redis:7-alpine
-    container_name: capitec-dispute-redis
+    container_name: capi-dispute-redis
     ports:
       - "6379:6379"
     healthcheck:
@@ -29,7 +29,7 @@ services:
 
   kafka:
     image: apache/kafka:3.8.0
-    container_name: capitec-dispute-kafka
+    container_name: capi-dispute-kafka
     ports:
       - "9092:9092"
     environment:
@@ -49,7 +49,7 @@ services:
   mailhog:
     image: mailhog/mailhog:latest
     platform: linux/amd64
-    container_name: capitec-dispute-mailhog
+    container_name: capi-dispute-mailhog
     ports:
       - "1025:1025"
       - "8025:8025"
@@ -58,7 +58,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: capitec-dispute-backend
+    container_name: capi-dispute-backend
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,9 +70,9 @@ services:
         condition: service_started
     environment:
       SERVER_PORT: 8080
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/capitec_disputes
-      SPRING_DATASOURCE_USERNAME: capitec
-      SPRING_DATASOURCE_PASSWORD: capitec_secret
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/capi_disputes
+      SPRING_DATASOURCE_USERNAME: capi
+      SPRING_DATASOURCE_PASSWORD: capi_secret
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -96,7 +96,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: capitec-dispute-frontend
+    container_name: capi-dispute-frontend
     depends_on:
       backend:
         condition: service_healthy

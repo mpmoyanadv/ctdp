@@ -13,13 +13,13 @@ import { AuthService } from '../../core/services/auth.service';
     <div class="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-10">
       <div class="max-w-4xl w-full grid grid-cols-1 lg:grid-cols-5 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
         <!-- Brand Left Panel -->
-        <div class="lg:col-span-2 bg-gradient-to-br from-capitec-blue via-capitec-light to-capitec-dark text-white p-8 flex flex-col justify-between">
+        <div class="lg:col-span-2 bg-gradient-to-br from-capi-blue via-capi-light to-capi-dark text-white p-8 flex flex-col justify-between">
           <div>
             <div class="inline-flex items-center gap-2 bg-white/15 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-6">
               Global One Digital Security
             </div>
             <h1 class="text-2xl font-bold leading-tight mb-3">
-              Capitec Transactions Dispute Portal
+              Cap Trans Dsp Ptl
             </h1>
             <p class="text-blue-100 text-sm leading-relaxed">
               Log unauthorized card or PayShap disputes, upload cryptographic SHA-256 evidence, and track real-time investigation progress across internal &amp; partner rails.
@@ -29,20 +29,20 @@ import { AuthService } from '../../core/services/auth.service';
           <div class="mt-8 pt-6 border-t border-white/20">
             <p class="text-xs uppercase tracking-wider text-blue-200 font-semibold mb-2">Demo Accounts (Quick Fill)</p>
             <div class="space-y-1.5 text-xs">
-              <button type="button" (click)="quickFill('customer@capitec.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
-                Customer 1: customer&#64;capitec.test
+              <button type="button" (click)="quickFill('customer@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
+                Customer 1: customer&#64;capi.test
               </button>
-              <button type="button" (click)="quickFill('customer2@capitec.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
-                Customer 2: customer2&#64;capitec.test
+              <button type="button" (click)="quickFill('customer2@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
+                Customer 2: customer2&#64;capi.test
               </button>
-              <button type="button" (click)="quickFill('staff@capitec.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
-                Internal Staff: staff&#64;capitec.test
+              <button type="button" (click)="quickFill('staff@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
+                Internal Staff: staff&#64;capi.test
               </button>
               <button type="button" (click)="quickFill('affiliate@bankserv.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
                 Bankserv Affiliate: affiliate&#64;bankserv.test
               </button>
-              <button type="button" (click)="quickFill('admin@capitec.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
-                System Admin: admin&#64;capitec.test
+              <button type="button" (click)="quickFill('admin@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
+                System Admin: admin&#64;capi.test
               </button>
             </div>
           </div>
@@ -85,8 +85,8 @@ import { AuthService } from '../../core/services/auth.service';
                 type="email"
                 required
                 [(ngModel)]="email"
-                placeholder="customer@capitec.test"
-                class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-capitec-blue focus:border-capitec-blue outline-none text-sm"
+                placeholder="customer@capi.test"
+                class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-capi-blue focus:border-capi-blue outline-none text-sm"
               />
             </div>
 
@@ -99,7 +99,7 @@ import { AuthService } from '../../core/services/auth.service';
                 required
                 [(ngModel)]="password"
                 placeholder="Enter your password"
-                class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-capitec-blue focus:border-capitec-blue outline-none text-sm"
+                class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-capi-blue focus:border-capi-blue outline-none text-sm"
               />
             </div>
 
@@ -107,7 +107,7 @@ import { AuthService } from '../../core/services/auth.service';
               id="login-submit-btn"
               type="submit"
               [disabled]="loading"
-              class="w-full py-3 px-4 rounded-lg bg-capitec-blue hover:bg-capitec-dark text-white font-semibold text-sm shadow transition disabled:opacity-50"
+              class="w-full py-3 px-4 rounded-lg bg-capi-blue hover:bg-capi-dark text-white font-semibold text-sm shadow transition disabled:opacity-50"
             >
               {{ loading ? 'Authenticating...' : 'Sign In Securely' }}
             </button>
@@ -115,7 +115,7 @@ import { AuthService } from '../../core/services/auth.service';
 
           <div class="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span>Account locked after fraud alert?</span>
-            <a routerLink="/reset-password-verify" class="text-capitec-blue font-semibold hover:underline">
+            <a routerLink="/reset-password-verify" class="text-capi-blue font-semibold hover:underline">
               Verify 6-Digit OTP &amp; Reset Password
             </a>
           </div>

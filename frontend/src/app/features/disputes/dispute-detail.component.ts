@@ -38,7 +38,7 @@ import {
             </div>
             <div class="pt-2">
               <a [routerLink]="[auth.getHomeRouteForRole(auth.currentUser()?.role)]"
-                 class="inline-block px-5 py-2.5 rounded-lg bg-capitec-blue text-white text-sm font-semibold">
+                 class="inline-block px-5 py-2.5 rounded-lg bg-capi-blue text-white text-sm font-semibold">
                 Return to My Dashboard
               </a>
             </div>
@@ -51,7 +51,7 @@ import {
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <div class="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                  <a [routerLink]="[auth.getHomeRouteForRole(auth.currentUser()?.role)]" class="text-capitec-blue font-semibold hover:underline">
+                  <a [routerLink]="[auth.getHomeRouteForRole(auth.currentUser()?.role)]" class="text-capi-blue font-semibold hover:underline">
                     &larr; Back to Dashboard
                   </a>
                   <span>&bull;</span>
@@ -67,8 +67,11 @@ import {
                   }
                 </div>
                 <p class="text-sm text-slate-600 mt-1">
-                  <strong>{{ dispute.merchantName }}</strong> &bull; Rail: <strong>{{ dispute.paymentRail }}</strong> &bull; Category: <strong>{{ dispute.category }}</strong>
+                  <strong>{{ dispute.merchantName }}</strong> &bull; Rail: <strong>{{ dispute.paymentRail }}</strong> &bull; Category: <strong>{{ dispute.category }}</strong> &bull; Channel: <strong>{{ dispute.sourceChannel || 'WEB_PORTAL' }}</strong>
                 </p>
+                @if (dispute.contactChannelMetadata) {
+                  <p class="text-xs font-mono text-slate-500 mt-0.5">{{ dispute.contactChannelMetadata }}</p>
+                }
               </div>
 
               <div class="text-left md:text-right">
@@ -128,7 +131,7 @@ import {
                     id="reopen-dispute-btn"
                     type="button"
                     (click)="showReopenForm = !showReopenForm"
-                    class="px-4 py-2.5 rounded-lg bg-capitec-red hover:bg-red-700 text-white text-xs font-bold shadow transition whitespace-nowrap"
+                    class="px-4 py-2.5 rounded-lg bg-capi-red hover:bg-red-700 text-white text-xs font-bold shadow transition whitespace-nowrap"
                   >
                     Re-open / File Linked Dispute
                   </button>
@@ -152,7 +155,7 @@ import {
                         id="confirm-reopen-submit-btn"
                         type="submit"
                         [disabled]="busy"
-                        class="px-5 py-2 rounded-lg bg-capitec-blue hover:bg-capitec-dark text-white text-xs font-bold transition"
+                        class="px-5 py-2 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-bold transition"
                       >
                         Submit Linked Dispute
                       </button>
@@ -221,7 +224,7 @@ import {
                           }
                           @if (n.internalOnly) {
                             <span class="px-2 py-0.5 rounded bg-slate-700 text-white text-[11px] font-bold">
-                              Internal Capitec Note
+                              Internal Capi Note
                             </span>
                           }
                         </div>
@@ -242,7 +245,7 @@ import {
                       required
                       [(ngModel)]="noteMessage"
                       placeholder="Write a note or request supporting documentation..."
-                      class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-capitec-blue outline-none"
+                      class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-capi-blue outline-none"
                     ></textarea>
 
                     @if (isStaffOrAdmin()) {
@@ -253,7 +256,7 @@ import {
                             type="checkbox"
                             name="requiresCustomerReply"
                             [(ngModel)]="requiresCustomerReply"
-                            class="rounded text-capitec-blue"
+                            class="rounded text-capi-blue"
                           />
                           <span>Requires Customer Reply (Sets status to PENDING_CUSTOMER_ACTION)</span>
                         </label>
@@ -264,9 +267,9 @@ import {
                             type="checkbox"
                             name="internalOnly"
                             [(ngModel)]="internalOnly"
-                            class="rounded text-capitec-blue"
+                            class="rounded text-capi-blue"
                           />
-                          <span>Internal Capitec Note Only</span>
+                          <span>Internal Capi Note Only</span>
                         </label>
                       </div>
                     }
@@ -276,7 +279,7 @@ import {
                         id="add-note-submit-btn"
                         type="submit"
                         [disabled]="busy"
-                        class="px-4 py-2 rounded-lg bg-capitec-blue hover:bg-capitec-dark text-white text-xs font-semibold transition"
+                        class="px-4 py-2 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition"
                       >
                         Post Note
                       </button>
@@ -462,7 +465,7 @@ import {
                       type="button"
                       [disabled]="busy"
                       (click)="applyStatusChange()"
-                      class="w-full py-2.5 px-4 rounded-lg bg-capitec-blue hover:bg-capitec-dark text-white text-xs font-bold transition"
+                      class="w-full py-2.5 px-4 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-bold transition"
                     >
                       Apply Status ({{ targetStatus }})
                     </button>
@@ -474,7 +477,7 @@ import {
               @if (!dispute.terminal && auth.currentUser()?.role === 'CUSTOMER' && dispute.status !== 'ESCALATED') {
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3">
                   <h3 class="text-sm font-bold text-slate-900">Need Supervisor Review?</h3>
-                  <p class="text-xs text-slate-500">You may escalate an active dispute to a Capitec Supervisor at any time.</p>
+                  <p class="text-xs text-slate-500">You may escalate an active dispute to a Capi Supervisor at any time.</p>
                   <button
                     type="button"
                     (click)="escalateToSupervisor()"

@@ -7,10 +7,10 @@ RUN mvn clean package -B
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-RUN addgroup -S capitec && adduser -S capitec -G capitec \
+RUN addgroup -S capi && adduser -S capi -G capi \
     && mkdir -p /app/storage/attachments \
-    && chown -R capitec:capitec /app
-USER capitec
+    && chown -R capi:capi /app
+USER capi
 COPY --from=build /workspace/target/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

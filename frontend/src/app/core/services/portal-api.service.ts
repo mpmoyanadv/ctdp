@@ -9,9 +9,12 @@ import {
   DisputeStatus,
   DisputeSummary,
   DisputeAttachment,
+  OmnichannelSimulationResponse,
   ProductivityReport,
+  SmsWebhookSimulationRequest,
   UserDomain,
-  UserProfile
+  UserProfile,
+  VoiceCallSimulationRequest
 } from '../models/portal.models';
 
 @Injectable({ providedIn: 'root' })
@@ -133,6 +136,14 @@ export class PortalApiService {
       assignedDomain,
       status
     });
+  }
+
+  simulateSmsWebhook(payload: SmsWebhookSimulationRequest): Observable<OmnichannelSimulationResponse> {
+    return this.http.post<OmnichannelSimulationResponse>('/api/v1/omnichannel/sms-webhook', payload);
+  }
+
+  simulateVoiceCall(payload: VoiceCallSimulationRequest): Observable<OmnichannelSimulationResponse> {
+    return this.http.post<OmnichannelSimulationResponse>('/api/v1/omnichannel/voice-call', payload);
   }
 }
 

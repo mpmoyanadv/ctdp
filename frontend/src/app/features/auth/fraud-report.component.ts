@@ -11,7 +11,7 @@ import { AuthService } from '../../core/services/auth.service';
     <div class="max-w-xl mx-auto px-4 py-14">
       <div class="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
         <div class="bg-red-700 text-white px-7 py-6">
-          <p class="text-xs font-bold uppercase tracking-wider text-red-200 mb-1">Capitec Instant Fraud Shield</p>
+          <p class="text-xs font-bold uppercase tracking-wider text-red-200 mb-1">Capi Instant Fraud Shield</p>
           <h1 class="text-2xl font-bold">Emergency Account Lockdown</h1>
         </div>
 
@@ -35,7 +35,7 @@ import { AuthService } from '../../core/services/auth.service';
 
               <div class="pt-3 flex flex-wrap gap-3">
                 <a [routerLink]="['/reset-password-verify']" [queryParams]="{ email: lockedEmail }"
-                   class="px-5 py-2.5 rounded-lg bg-capitec-blue hover:bg-capitec-dark text-white text-sm font-semibold transition">
+                   class="px-5 py-2.5 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-sm font-semibold transition">
                   Enter 6-Digit OTP &amp; Reset Password
                 </a>
                 <a routerLink="/login"
@@ -48,7 +48,7 @@ import { AuthService } from '../../core/services/auth.service';
             <div class="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-sm mb-4">
               {{ errorMessage || 'Unable to process fraud lockdown token.' }}
             </div>
-            <a routerLink="/login" class="inline-block px-4 py-2 rounded-lg bg-capitec-blue text-white text-sm font-semibold">
+            <a routerLink="/login" class="inline-block px-4 py-2 rounded-lg bg-capi-blue text-white text-sm font-semibold">
               Return to Login
             </a>
           }
@@ -75,7 +75,7 @@ export class FraudReportComponent implements OnInit {
         this.processing = false;
         this.lockedSuccess = true;
         this.lockedEmail = params['email'] || '';
-        this.message = 'Your Capitec account is now locked and a 6-digit verification code has been emailed to you.';
+        this.message = 'Your Capi account is now locked and a 6-digit verification code has been emailed to you.';
         return;
       }
       if (!token) {

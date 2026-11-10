@@ -1,0 +1,153 @@
+package za.co.capi.dispute.application.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import za.co.capi.dispute.domain.model.AuditLog;
+import za.co.capi.dispute.domain.repository.AuditLogRepository;
+import za.co.capi.dispute.infrastructure.messaging.KafkaEventService;
+import za.co.capi.dispute.presentation.dto.ApiDtos.AuditLogDto;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+@Service
+public class AuditService {
+
+    private final AuditLogRepository auditLogRepository;
+    private final ObjectMapper objectMapper;
+    private final KafkaEventService kafkaEventService;
+
+    public AuditService(
+            AuditLogRepository auditLogRepository,
+            ObjectMapper objectMapper,
+            KafkaEventService kafkaEventService) {
+        this.auditLogRepository = auditLogRepository;
+        this.objectMapper = objectMapper;
+        this.kafkaEventService = kafkaEventService;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AuditLog logEvent(
+            UUID actorId,
+            String actorEmail,
+            String severity,
+            String eventType,
+            String entityName,
+            String entityId,
+            String ipAddress,
+            Map<String, Object> metadataMap) {
+
+        AuditLog entry = new AuditLog();
+        entry.setActorId(actorId);
+        entry.setActorEmail(actorEmail);
+        entry.setSeverity(severity != null ? severity : "INFO");
+        entry.setEventType(eventType);
+        entry.setEntityName(entityName);
+        entry.setEntityId(entityId);
+        entry.setIpAddress(ipAddress != null ? ipAddress : "unknown");
+        entry.setMetadata(serializeMetadata(metadataMap));
+        entry.setTimestamp(Instant.now());
+        AuditLog saved = auditLogRepository.save(entry);
+
+        kafkaEventService.publishSecurityAuditEvent(
+                eventType,
+                entityId != null ? entityId : "SYSTEM",
+                Map.of(
+                        "auditId", saved.getId() != null ? saved.getId() : 0L,
+                        "severity", saved.getSeverity(),
+                        "actorEmail", actorEmail != null ? actorEmail : "ANONYMOUS",
+                        "entityName", entityName != null ? entityName : "System",
+                        "entityId", entityId != null ? entityId : "N/A",
+                        "ipAddress", saved.getIpAddress()
+                )
+        );
+        return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AuditLogDto> getAllLogs(String eventTypeFilter) {
+        List<AuditLog> logs = (eventTypeFilter != null && !eventTypeFilter.isBlank())
+                ? auditLogRepository.findByEventTypeOrderByTimestampDesc(eventTypeFilter.trim())
+                : auditLogRepository.findAllByOrderByTimestampDesc();
+
+        return logs.stream()
+                .map(a -> new AuditLogDto(
+                        a.getId(),
+                        a.getActorId(),
+                        a.getActorEmail(),
+                        a.getSeverity(),
+                        a.getEventType(),
+                        a.getEntityName(),
+                        a.getEntityId(),
+                        a.getIpAddress(),
+                        a.getMetadata(),
+                        a.getTimestamp()
+                ))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public String exportImmutableCsv() {
+        List<AuditLog> logs = auditLogRepository.findAllByOrderByTimestampDesc();
+        StringBuilder sb = new StringBuilder();
+        sb.append("id,timestamp,severity,event_type,actor_id,actor_email,entity_name,entity_id,ip_address,metadata\n");
+        for (AuditLog log : logs) {
+            sb.append(csvCell(log.getId() != null ? log.getId().toString() : "")).append(',')
+              .append(csvCell(log.getTimestamp() != null ? log.getTimestamp().toString() : "")).append(',')
+              .append(csvCell(log.getSeverity())).append(',')
+              .append(csvCell(log.getEventType())).append(',')
+              .append(csvCell(log.getActorId() != null ? log.getActorId().toString() : "")).append(',')
+              .append(csvCell(log.getActorEmail())).append(',')
+              .append(csvCell(log.getEntityName())).append(',')
+              .append(csvCell(log.getEntityId())).append(',')
+              .append(csvCell(log.getIpAddress())).append(',')
+              .append(csvCell(log.getMetadata()))
+              .append('\n');
+        }
+        return sb.toString();
+    }
+
+    public static String extractClientIp(HttpServletRequest request) {
+        if (request == null) {
+            return "127.0.0.1";
+        }
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        return request.getRemoteAddr() != null ? request.getRemoteAddr() : "127.0.0.1";
+    }
+
+    private String serializeMetadata(Map<String, Object> metadataMap) {
+        if (metadataMap == null || metadataMap.isEmpty()) {
+            return "{}";
+        }
+        try {
+            return objectMapper.writeValueAsString(metadataMap);
+        } catch (JsonProcessingException e) {
+            return "{\"raw\":\"" + metadataMap.toString().replace("\"", "'") + "\"}";
+        }
+    }
+
+    private String csvCell(String value) {
+        if (value == null) {
+            return "";
+        }
+        String escaped = value.replace("\"", "\"\"");
+        if (escaped.contains(",") || escaped.contains("\"") || escaped.contains("\n") || escaped.contains("\r")) {
+            return "\"" + escaped + "\"";
+        }
+        return escaped;
+    }
+}
+

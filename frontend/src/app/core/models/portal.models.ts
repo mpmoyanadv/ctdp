@@ -1,5 +1,6 @@
 export type UserRole = 'CUSTOMER' | 'STAFF' | 'AFFILIATE' | 'ADMIN';
-export type UserDomain = 'CUSTOMER' | 'INTERNAL_CAPITEC' | 'PARTNER_BANKSERV' | 'PARTNER_MERCHANT';
+export type UserDomain = 'CUSTOMER' | 'INTERNAL_CAPI' | 'PARTNER_BANKSERV' | 'PARTNER_MERCHANT';
+export type DisputeChannel = 'WEB_PORTAL' | 'SMS' | 'WHATSAPP' | 'PHONE_CALL';
 export type DisputeStatus =
   | 'LOGGED'
   | 'IN_REVIEW'
@@ -120,6 +121,8 @@ export interface DisputeSummary {
   originalDisputeReference: string | null;
   customer: CustomerSummary;
   attachmentCount: number;
+  sourceChannel: DisputeChannel;
+  contactChannelMetadata: string | null;
   createdAt: string;
   resolvedAt: string | null;
 }
@@ -169,5 +172,33 @@ export interface WorkSessionDetail {
 export interface ProductivityReport {
   staffSummaries: StaffProductivityRow[];
   recentSessions: WorkSessionDetail[];
+}
+
+export interface SmsWebhookSimulationRequest {
+  channel: 'SMS' | 'WHATSAPP';
+  fromPhoneNumber?: string;
+  transactionId?: string | null;
+  messageBody: string;
+  idempotencyKey?: string;
+}
+
+export interface VoiceCallSimulationRequest {
+  callerPhoneNumber?: string;
+  transactionId?: string | null;
+  transactionReference?: string | null;
+  scenario: string;
+  category: DisputeCategory;
+  callerStatement: string;
+  agentNotes?: string;
+  cardFreezeRequested: boolean;
+  idempotencyKey?: string;
+}
+
+export interface OmnichannelSimulationResponse {
+  dispute: DisputeDetail;
+  channel: DisputeChannel;
+  outboundReply: string;
+  channelTranscript: string;
+  processedAt: string;
 }
 

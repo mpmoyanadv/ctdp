@@ -12,7 +12,7 @@ import { DisputeSummary } from '../../core/models/portal.models';
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <span class="text-xs font-bold uppercase tracking-wider text-capitec-blue">Internal Capitec Operations</span>
+          <span class="text-xs font-bold uppercase tracking-wider text-capi-blue">Internal Capi Operations</span>
           <h1 class="text-2xl font-bold text-slate-900 mt-0.5">Dispute Investigator Workbench</h1>
           <p class="text-sm text-slate-500 mt-1">
             Claim open cases to start productivity session tracking, request customer affidavits, delegate PayShap cases to BankservAfrica, or escalate to Supervisor.
@@ -24,7 +24,7 @@ import { DisputeSummary } from '../../core/models/portal.models';
               type="button"
               (click)="activeFilter = f.key"
               [class]="activeFilter === f.key
-                ? 'px-3.5 py-1.5 rounded-lg bg-capitec-blue text-white text-xs font-semibold'
+                ? 'px-3.5 py-1.5 rounded-lg bg-capi-blue text-white text-xs font-semibold'
                 : 'px-3.5 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold'"
             >
               {{ f.label }}
@@ -70,7 +70,7 @@ import { DisputeSummary } from '../../core/models/portal.models';
                   </td>
                   <td class="px-5 py-4">
                     <div class="font-medium text-slate-800">{{ d.merchantName }}</div>
-                    <div class="text-xs text-slate-500">{{ d.paymentRail }} &bull; {{ d.category }}</div>
+                    <div class="text-xs text-slate-500">{{ d.paymentRail }} &bull; {{ d.category }} &bull; {{ d.sourceChannel || 'WEB_PORTAL' }}</div>
                   </td>
                   <td class="px-5 py-4 font-bold text-slate-900">R {{ d.amount | number:'1.2-2' }}</td>
                   <td class="px-5 py-4 text-xs">
@@ -90,7 +90,7 @@ import { DisputeSummary } from '../../core/models/portal.models';
                         Claim Case
                       </button>
                     }
-                    @if (!d.terminal && d.assignedDomain === 'INTERNAL_CAPITEC' && d.paymentRail === 'PAYSHAP') {
+                    @if (!d.terminal && d.assignedDomain === 'INTERNAL_CAPI' && d.paymentRail === 'PAYSHAP') {
                       <button
                         type="button"
                         (click)="delegateToBankserv(d)"
@@ -100,7 +100,7 @@ import { DisputeSummary } from '../../core/models/portal.models';
                       </button>
                     }
                     <a [routerLink]="['/disputes', d.id]"
-                       class="px-3 py-1.5 rounded-lg bg-capitec-blue hover:bg-capitec-dark text-white text-xs font-semibold transition inline-block">
+                       class="px-3 py-1.5 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition inline-block">
                       Open Case
                     </a>
                   </td>

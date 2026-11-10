@@ -4,8 +4,8 @@ import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { AuthResponse, FraudReportResponse, UserProfile } from '../models/portal.models';
 
-const TOKEN_KEY = 'capitec_portal_token';
-const USER_KEY = 'capitec_portal_user';
+const TOKEN_KEY = 'capi_portal_token';
+const USER_KEY = 'capi_portal_user';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {

@@ -11,11 +11,11 @@
         <relativePath/>
     </parent>
 
-    <groupId>za.co.capitec</groupId>
+    <groupId>za.co.capi</groupId>
     <artifactId>transactions-dispute-portal</artifactId>
     <version>1.0.0</version>
-    <name>Capitec Transactions Dispute Portal</name>
-    <description>Clean-architecture banking transactions dispute portal</description>
+    <name>Cap Trans Dsp Ptl</name>
+    <description>Clean-architecture transaction dispute service</description>
 
     <properties>
         <java.version>21</java.version>

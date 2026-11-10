@@ -1,6 +1,6 @@
-# Capitec Transactions Dispute Portal
+# Cap Trans Dsp Ptl
 
-Full-stack banking transaction dispute management application built with **Java 21**, **Spring Boot 3.3.5**, **PostgreSQL 16**, **Redis 7**, **Apache Kafka 3.8**, and **Angular 18**.
+Full-stack transaction dispute management application built with **Java 21**, **Spring Boot 3.3.5**, **PostgreSQL 16**, **Redis 7**, **Apache Kafka 3.8**, and **Angular 18**.
 
 Customers can view settled account transactions across payment rails (`CARD_POS`, `ONLINE_ECOMMERCE`, `PAYSHAP`, `DEBIT_ORDER`), submit disputes with supporting evidence, filter active vs. historic disputed transactions, and re-open rejected claims with full case lineage. Internal staff, external clearing partners, and admins handle investigation, escalation, PII-masked delegation, auditing, and turnaround reporting.
 
@@ -15,12 +15,12 @@ transactions_dispute_portal/
 │   ├── Dockerfile            # Multi-stage Maven build + JUnit tests -> JRE 21 Alpine
 │   ├── pom.xml
 │   └── src/
-│       ├── main/java/za/co/capitec/dispute/
+│       ├── main/java/za/co/capi/dispute/
 │       │   ├── domain/           # JPA entities & repositories
 │       │   ├── application/      # Core business services (Auth, Dispute, Audit, Storage, PII Masking, Productivity)
 │       │   ├── infrastructure/   # Security (JWT), Redis idempotency lock, Kafka producer/consumer, OpenAPI, DataSeeder
 │       │   └── presentation/     # REST controllers, DTOs, global exception handler
-│       └── test/java/za/co/capitec/dispute/
+│       └── test/java/za/co/capi/dispute/
 │           ├── DisputePortalIntegrationTest.java
 │           └── PiiMaskingServiceTest.java
 └── frontend/
@@ -42,7 +42,8 @@ transactions_dispute_portal/
 - **External Partner PII Masking:** Disputes delegated to `PARTNER_BANKSERV` or `PARTNER_MERCHANT` automatically mask customer PII (`SA ID`, `phone`, `account number`, `email`, `name`) in API responses.
 - **Login Fraud Lockdown & OTP Recovery:** Customer logins send an alert email (via MailHog) with an "It Wasn't Me" link that locks the account, revokes active JWTs via `tokenVersion`, and emails a 6-digit OTP to verify and reset the password.
 - **Redis Idempotency Locking:** `POST /api/v1/disputes` uses atomic Redis `SET NX EX` locks (via `X-Idempotency-Key` or request payload fingerprint) to prevent duplicate submissions on retries (`409 Conflict`).
-- **Apache Kafka Event Streaming:** Publishes and consumes domain events across `capitec.dispute.lifecycle.events`, `capitec.security.audit.events`, and `capitec.notification.alert.events`.
+- **Apache Kafka Event Streaming:** Publishes and consumes domain events across `capi.dispute.lifecycle.events`, `capi.security.audit.events`, and `capi.notification.alert.events`.
+- **Omnichannel SMS / WhatsApp / Voice Call Simulator:** Interactive simulator at `/simulator` allowing realistic dispute intake from inbound SMS/WhatsApp alerts and Call Centre voice calls (ATM cash-not-dispensed, filling station double-tap, or suspicious transaction alerts), complete with gateway auto-replies, call transcripts, and email receipts.
 - **Staff Productivity Tracking:** Tracks active work duration (`StaffWorkSession`) from dispute claim to resolution, escalation, or delegation.
 
 ---
@@ -53,11 +54,11 @@ transactions_dispute_portal/
 
 | Email | Role | Domain |
 | :--- | :--- | :--- |
-| `customer@capitec.test` | `CUSTOMER` | `CUSTOMER` |
-| `customer2@capitec.test` | `CUSTOMER` | `CUSTOMER` |
-| `staff@capitec.test` | `STAFF` | `INTERNAL_CAPITEC` |
+| `customer@capi.test` | `CUSTOMER` | `CUSTOMER` |
+| `customer2@capi.test` | `CUSTOMER` | `CUSTOMER` |
+| `staff@capi.test` | `STAFF` | `INTERNAL_CAPI` |
 | `affiliate@bankserv.test` | `AFFILIATE` | `PARTNER_BANKSERV` |
-| `admin@capitec.test` | `ADMIN` | `INTERNAL_CAPITEC` |
+| `admin@capi.test` | `ADMIN` | `INTERNAL_CAPI` |
 
 ---
 
@@ -85,7 +86,7 @@ Services:
 - **Swagger UI (OpenAPI):** http://localhost:8080/swagger-ui.html (also proxied at http://localhost:4200/swagger-ui/index.html)
 - **OpenAPI JSON Spec:** http://localhost:8080/v3/api-docs
 - **MailHog Web UI:** http://localhost:8025
-- **PostgreSQL 16:** `localhost:5432` (`capitec_disputes` / `capitec` / `capitec_secret`)
+- **PostgreSQL 16:** `localhost:5432` (`capi_disputes` / `capi` / `capi_secret`)
 - **Redis 7:** `localhost:6379`
 - **Apache Kafka 3.8:** `localhost:9092`
 
@@ -160,3 +161,5 @@ Coverage includes:
 | `GET /api/v1/admin/events/kafka-stream` | `ADMIN` | Inspect Kafka topics/events and Redis lock status |
 | `POST /api/v1/admin/users/{id}/unlock` | `ADMIN` | Unlock a locked user account |
 | `POST /api/v1/admin/disputes/{id}/assign` | `ADMIN` | Assign/reassign dispute to investigator or partner domain |
+| `POST /api/v1/omnichannel/sms-webhook` | Authenticated | Simulate inbound SMS/WhatsApp dispute intake & auto-reply |
+| `POST /api/v1/omnichannel/voice-call` | Authenticated | Simulate Call Centre / IVR voice call dispute intake & transcript |

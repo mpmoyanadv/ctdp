@@ -3,11 +3,11 @@ server:
 
 spring:
   application:
-    name: capitec-dispute-portal
+    name: capi-dispute-portal
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/capitec_disputes}
-    username: ${SPRING_DATASOURCE_USERNAME:capitec}
-    password: ${SPRING_DATASOURCE_PASSWORD:capitec_secret}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/capi_disputes}
+    username: ${SPRING_DATASOURCE_USERNAME:capi}
+    password: ${SPRING_DATASOURCE_PASSWORD:capi_secret}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -42,7 +42,7 @@ spring:
       acks: all
       retries: 2
     consumer:
-      group-id: capitec-dispute-portal-consumer-group
+      group-id: capi-dispute-portal-consumer-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -73,13 +73,13 @@ springdoc:
 
 app:
   jwt:
-    secret: ${APP_JWT_SECRET:CapitecBankDisputePortalProductionGradeHmacSha256SecretKey2026Secure!}
+    secret: ${APP_JWT_SECRET:CapiBankDisputePortalProductionGradeHmacSha256SecretKey2026Secure!}
     expiration-seconds: 28800
   frontend-base-url: ${APP_FRONTEND_BASE_URL:http://localhost:4200}
   storage:
     attachments-dir: ${APP_ATTACHMENTS_DIR:/app/storage/attachments}
   mail:
-    from: security-alerts@capitec.test
+    from: security-alerts@capi.test
   kafka:
     enabled: ${APP_KAFKA_ENABLED:true}
   idempotency:

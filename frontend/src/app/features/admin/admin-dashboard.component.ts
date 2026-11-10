@@ -19,8 +19,8 @@ import {
       <!-- Supervisor Header -->
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <span class="text-xs font-bold uppercase tracking-wider text-capitec-red">Supervisor &amp; Governance Command Center</span>
-          <h1 class="text-2xl font-bold text-slate-900 mt-0.5">Capitec System Administration Portal</h1>
+          <span class="text-xs font-bold uppercase tracking-wider text-capi-red">Supervisor &amp; Governance Command Center</span>
+          <h1 class="text-2xl font-bold text-slate-900 mt-0.5">Capi System Administration Portal</h1>
           <p class="text-sm text-slate-500 mt-1">
             Review escalated cases, delegate cross-domain disputes, audit IDOR security boundary probes, export immutable CSV logs, and monitor investigator productivity.
           </p>
@@ -73,7 +73,7 @@ import {
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 class="text-lg font-bold text-slate-900">Supervisor Case Queue (Escalated &amp; All Cases)</h2>
-            <button type="button" (click)="loadAll()" class="text-xs text-capitec-blue font-semibold hover:underline">
+            <button type="button" (click)="loadAll()" class="text-xs text-capi-blue font-semibold hover:underline">
               Refresh Queue
             </button>
           </div>
@@ -140,7 +140,7 @@ import {
                         </button>
                       }
                       <a [routerLink]="['/disputes', d.id]"
-                         class="px-3 py-1.5 rounded-lg bg-capitec-blue hover:bg-capitec-dark text-white text-xs font-semibold transition inline-block">
+                         class="px-3 py-1.5 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition inline-block">
                         Inspect
                       </a>
                     </td>
@@ -177,7 +177,7 @@ import {
                 id="export-audit-csv-btn"
                 type="button"
                 (click)="exportCsv()"
-                class="px-4 py-2 rounded-lg bg-capitec-blue hover:bg-capitec-dark text-white text-xs font-semibold shadow transition"
+                class="px-4 py-2 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold shadow transition"
               >
                 Export Audit CSV
               </button>
@@ -235,7 +235,7 @@ import {
                 <h2 class="text-lg font-bold text-slate-900">Staff Investigator Productivity &amp; Turnaround Time Report</h2>
                 <p class="text-xs text-slate-500">Calculated automatically from StaffWorkSession timers between IN_REVIEW claim and escalation/resolution.</p>
               </div>
-              <button type="button" (click)="loadProductivity()" class="text-xs text-capitec-blue font-semibold hover:underline">
+              <button type="button" (click)="loadProductivity()" class="text-xs text-capi-blue font-semibold hover:underline">
                 Refresh Metrics
               </button>
             </div>
@@ -263,7 +263,7 @@ import {
                         <td class="px-6 py-4 font-bold text-emerald-700">{{ row.completedSessions }}</td>
                         <td class="px-6 py-4 font-semibold text-blue-700">{{ row.activeSessions }}</td>
                         <td class="px-6 py-4 font-mono font-bold text-slate-900">{{ row.totalDurationSeconds }} sec</td>
-                        <td class="px-6 py-4 font-mono font-bold text-capitec-blue">{{ row.averageDurationSeconds }} sec / session</td>
+                        <td class="px-6 py-4 font-mono font-bold text-capi-blue">{{ row.averageDurationSeconds }} sec / session</td>
                       </tr>
                     }
                   </tbody>
@@ -434,12 +434,12 @@ export class AdminDashboardComponent implements OnInit {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'capitec-audit-logs.csv';
+      a.download = 'capi-audit-logs.csv';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-      this.bannerMessage = 'Exported immutable audit log CSV (capitec-audit-logs.csv).';
+      this.bannerMessage = 'Exported immutable audit log CSV (capi-audit-logs.csv).';
       this.loadAuditLogs();
     });
   }
@@ -453,7 +453,7 @@ export class AdminDashboardComponent implements OnInit {
 
   tabClass(tab: string): string {
     return this.activeTab === tab
-      ? 'px-4 py-2 rounded-lg bg-capitec-blue text-white text-xs font-semibold shadow-sm'
+      ? 'px-4 py-2 rounded-lg bg-capi-blue text-white text-xs font-semibold shadow-sm'
       : 'px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold';
   }
 

@@ -11,7 +11,7 @@ import { AuthService } from '../../core/services/auth.service';
   template: `
     <div class="max-w-lg mx-auto px-4 py-12">
       <div class="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-        <div class="bg-capitec-blue text-white px-7 py-6">
+        <div class="bg-capi-blue text-white px-7 py-6">
           <p class="text-xs uppercase tracking-wider text-blue-200 font-semibold mb-1">Identity Verification</p>
           <h1 class="text-xl font-bold">Verify 6-Digit OTP &amp; Unlock Account</h1>
         </div>
@@ -25,7 +25,7 @@ import { AuthService } from '../../core/services/auth.service';
             <button
               type="button"
               (click)="goToLogin()"
-              class="w-full py-3 rounded-lg bg-capitec-blue hover:bg-capitec-dark text-white font-semibold text-sm transition"
+              class="w-full py-3 rounded-lg bg-capi-blue hover:bg-capi-dark text-white font-semibold text-sm transition"
             >
               Proceed to Sign In
             </button>
@@ -49,8 +49,8 @@ import { AuthService } from '../../core/services/auth.service';
                   type="email"
                   required
                   [(ngModel)]="email"
-                  placeholder="customer@capitec.test"
-                  class="w-full px-4 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-capitec-blue outline-none"
+                  placeholder="customer@capi.test"
+                  class="w-full px-4 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-capi-blue outline-none"
                 />
               </div>
 
@@ -64,7 +64,7 @@ import { AuthService } from '../../core/services/auth.service';
                   required
                   [(ngModel)]="otpCode"
                   placeholder="123456"
-                  class="w-full px-4 py-2.5 rounded-lg border border-slate-300 text-base tracking-widest font-mono focus:ring-2 focus:ring-capitec-blue outline-none"
+                  class="w-full px-4 py-2.5 rounded-lg border border-slate-300 text-base tracking-widest font-mono focus:ring-2 focus:ring-capi-blue outline-none"
                 />
               </div>
 
@@ -78,7 +78,7 @@ import { AuthService } from '../../core/services/auth.service';
                   minlength="8"
                   [(ngModel)]="newPassword"
                   placeholder="Minimum 8 characters"
-                  class="w-full px-4 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-capitec-blue outline-none"
+                  class="w-full px-4 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-capi-blue outline-none"
                 />
               </div>
 
@@ -86,14 +86,14 @@ import { AuthService } from '../../core/services/auth.service';
                 id="reset-submit-btn"
                 type="submit"
                 [disabled]="submitting"
-                class="w-full py-3 rounded-lg bg-capitec-blue hover:bg-capitec-dark text-white font-semibold text-sm transition disabled:opacity-50"
+                class="w-full py-3 rounded-lg bg-capi-blue hover:bg-capi-dark text-white font-semibold text-sm transition disabled:opacity-50"
               >
                 {{ submitting ? 'Verifying & Unlocking...' : 'Verify OTP & Restore Account Access' }}
               </button>
             </form>
 
             <div class="mt-5 text-center">
-              <a routerLink="/login" class="text-xs text-slate-500 hover:text-capitec-blue font-medium">
+              <a routerLink="/login" class="text-xs text-slate-500 hover:text-capi-blue font-medium">
                 Return to Sign In
               </a>
             </div>

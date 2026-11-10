@@ -25,9 +25,13 @@ import {
           </p>
         </div>
         <div class="flex items-center gap-3">
+          <a routerLink="/simulator"
+             class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition whitespace-nowrap">
+            SMS / WhatsApp / Call Simulator
+          </a>
           <div class="px-4 py-2 rounded-xl bg-blue-50 border border-blue-100 text-right">
             <div class="text-xs text-slate-500">Active Disputes</div>
-            <div class="text-lg font-bold text-capitec-blue">{{ activeDisputesCount }}</div>
+            <div class="text-lg font-bold text-capi-blue">{{ activeDisputesCount }}</div>
           </div>
           <div class="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-100 text-right">
             <div class="text-xs text-slate-500">Historic / Closed</div>
@@ -54,10 +58,10 @@ import {
 
       <!-- Log Dispute Form Modal/Drawer Panel -->
       @if (selectedTx) {
-        <div id="log-dispute-panel" class="bg-white rounded-2xl shadow-lg border-2 border-capitec-blue p-6">
+        <div id="log-dispute-panel" class="bg-white rounded-2xl shadow-lg border-2 border-capi-blue p-6">
           <div class="flex items-start justify-between mb-4 pb-4 border-b border-slate-100">
             <div>
-              <span class="text-xs font-bold uppercase tracking-wider text-capitec-blue">New Transaction Dispute</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-capi-blue">New Transaction Dispute</span>
               <h2 class="text-xl font-bold text-slate-900 mt-0.5">
                 Disputing: {{ selectedTx.merchantName }} (R {{ selectedTx.amount | number:'1.2-2' }})
               </h2>
@@ -82,7 +86,7 @@ import {
                   id="dispute-category"
                   name="category"
                   [(ngModel)]="category"
-                  class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white focus:ring-2 focus:ring-capitec-blue outline-none"
+                  class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white focus:ring-2 focus:ring-capi-blue outline-none"
                 >
                   <option value="UNAUTHORIZED_TRANSACTION">Unauthorized Transaction</option>
                   <option value="FRAUDULENT_CARD_USE">Fraudulent Card Use</option>
@@ -114,7 +118,7 @@ import {
                 required
                 [(ngModel)]="reason"
                 placeholder="Explain why you are disputing this transaction..."
-                class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-capitec-blue outline-none"
+                class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-capi-blue outline-none"
               ></textarea>
             </div>
 
@@ -128,7 +132,7 @@ import {
                 multiple
                 accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
                 (change)="onFilesSelected($event)"
-                class="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-capitec-blue hover:file:bg-blue-100"
+                class="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-capi-blue hover:file:bg-blue-100"
               />
               @if (selectedFiles.length > 0) {
                 <div class="mt-2 flex flex-wrap gap-2">
@@ -153,7 +157,7 @@ import {
                 id="submit-dispute-btn"
                 type="submit"
                 [disabled]="submitting"
-                class="px-6 py-2.5 rounded-lg bg-capitec-blue hover:bg-capitec-dark text-white text-sm font-semibold shadow transition disabled:opacity-50"
+                class="px-6 py-2.5 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-sm font-semibold shadow transition disabled:opacity-50"
               >
                 {{ submitting ? 'Submitting Dispute & Computing SHA-256...' : 'Submit Dispute' }}
               </button>
@@ -210,7 +214,7 @@ import {
                     <button
                       type="button"
                       (click)="openLogDispute(tx)"
-                      class="px-3.5 py-1.5 rounded-lg bg-capitec-red hover:bg-red-700 text-white text-xs font-semibold transition"
+                      class="px-3.5 py-1.5 rounded-lg bg-capi-red hover:bg-red-700 text-white text-xs font-semibold transition"
                     >
                       Log Dispute
                     </button>
@@ -234,7 +238,7 @@ import {
               type="button"
               (click)="disputeFilter = 'ALL'"
               [class]="disputeFilter === 'ALL'
-                ? 'px-3 py-1.5 rounded-lg bg-capitec-blue text-white text-xs font-semibold'
+                ? 'px-3 py-1.5 rounded-lg bg-capi-blue text-white text-xs font-semibold'
                 : 'px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold'"
             >
               All ({{ disputes.length }})
@@ -243,7 +247,7 @@ import {
               type="button"
               (click)="disputeFilter = 'ACTIVE'"
               [class]="disputeFilter === 'ACTIVE'
-                ? 'px-3 py-1.5 rounded-lg bg-capitec-blue text-white text-xs font-semibold'
+                ? 'px-3 py-1.5 rounded-lg bg-capi-blue text-white text-xs font-semibold'
                 : 'px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold'"
             >
               Active ({{ activeDisputesCount }})
@@ -252,12 +256,12 @@ import {
               type="button"
               (click)="disputeFilter = 'HISTORIC'"
               [class]="disputeFilter === 'HISTORIC'
-                ? 'px-3 py-1.5 rounded-lg bg-capitec-blue text-white text-xs font-semibold'
+                ? 'px-3 py-1.5 rounded-lg bg-capi-blue text-white text-xs font-semibold'
                 : 'px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold'"
             >
               Historic / Closed ({{ historicDisputesCount }})
             </button>
-            <button type="button" (click)="loadData()" class="ml-2 text-xs text-capitec-blue font-semibold hover:underline">
+            <button type="button" (click)="loadData()" class="ml-2 text-xs text-capi-blue font-semibold hover:underline">
               Refresh
             </button>
           </div>
@@ -293,7 +297,7 @@ import {
                     </td>
                     <td class="px-6 py-4">
                       <div class="font-medium text-slate-800">{{ d.merchantName }}</div>
-                      <div class="text-xs text-slate-500">{{ d.paymentRail }}</div>
+                      <div class="text-xs text-slate-500">{{ d.paymentRail }} &bull; {{ d.sourceChannel || 'WEB_PORTAL' }}</div>
                     </td>
                     <td class="px-6 py-4">
                       <div class="text-xs font-semibold text-slate-700">{{ d.category }}</div>
@@ -320,7 +324,7 @@ import {
                     <td class="px-6 py-4 text-xs text-slate-600">{{ d.attachmentCount }} file(s)</td>
                     <td class="px-6 py-4 text-right">
                       <a [routerLink]="['/disputes', d.id]"
-                         class="px-3.5 py-1.5 rounded-lg bg-capitec-blue hover:bg-capitec-dark text-white text-xs font-semibold transition inline-block">
+                         class="px-3.5 py-1.5 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition inline-block">
                         View Case
                       </a>
                     </td>

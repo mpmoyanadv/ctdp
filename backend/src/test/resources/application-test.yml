@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:capitec_test_db;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    url: jdbc:h2:mem:capi_test_db;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -16,13 +16,13 @@ spring:
 
 app:
   jwt:
-    secret: TestSecretKeyForCapitecTransactionsDisputePortalJUnitValidation2026!
+    secret: TestSecretKeyForCapiTransactionsDisputePortalJUnitValidation2026!
     expiration-seconds: 3600
   frontend-base-url: http://localhost:4200
   storage:
     attachments-dir: target/test-attachments
   mail:
-    from: security-alerts@capitec.test
+    from: security-alerts@capi.test
   kafka:
     enabled: false
   idempotency:

@@ -67,7 +67,7 @@ import { DisputeSummary } from '../../core/models/portal.models';
                     </td>
                     <td class="px-6 py-4 text-right">
                       <a [routerLink]="['/disputes', d.id]"
-                         class="px-3.5 py-1.5 rounded-lg bg-capitec-blue hover:bg-capitec-dark text-white text-xs font-semibold transition inline-block">
+                         class="px-3.5 py-1.5 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition inline-block">
                         Inspect &amp; Resolve
                       </a>
                     </td>

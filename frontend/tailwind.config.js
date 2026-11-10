@@ -6,7 +6,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        capitec: {
+        capi: {
           blue: '#00529B',
           light: '#0072CE',
           dark: '#00386B',

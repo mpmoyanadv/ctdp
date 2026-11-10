@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "capitec-dispute-portal-ui": {
+    "capi-dispute-portal-ui": {
       "projectType": "application",
       "root": "",
       "sourceRoot": "src",
@@ -12,7 +12,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/capitec-dispute-portal-ui",
+            "outputPath": "dist/capi-dispute-portal-ui",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
@@ -53,10 +53,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "capitec-dispute-portal-ui:build:production"
+              "buildTarget": "capi-dispute-portal-ui:build:production"
             },
             "development": {
-              "buildTarget": "capitec-dispute-portal-ui:build:development"
+              "buildTarget": "capi-dispute-portal-ui:build:development"
             }
           },
           "defaultConfiguration": "development"

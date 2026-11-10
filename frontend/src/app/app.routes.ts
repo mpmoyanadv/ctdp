@@ -8,6 +8,7 @@ import { StaffDashboardComponent } from './features/staff/staff-dashboard.compon
 import { AffiliateDashboardComponent } from './features/affiliate/affiliate-dashboard.component';
 import { AdminDashboardComponent } from './features/admin/admin-dashboard.component';
 import { DisputeDetailComponent } from './features/disputes/dispute-detail.component';
+import { OmnichannelSimulatorComponent } from './features/omnichannel/omnichannel-simulator.component';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'login' },
@@ -38,6 +39,11 @@ export const routes: Routes = [
     path: 'disputes/:id',
     component: DisputeDetailComponent,
     canActivate: [authGuard]
+  },
+  {
+    path: 'simulator',
+    component: OmnichannelSimulatorComponent,
+    canActivate: [roleGuard(['CUSTOMER', 'STAFF', 'ADMIN'])]
   },
   { path: '**', redirectTo: 'login' }
 ];
