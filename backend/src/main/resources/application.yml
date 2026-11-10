@@ -1,0 +1,87 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: capitec-dispute-portal
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/capitec_disputes}
+    username: ${SPRING_DATASOURCE_USERNAME:capitec}
+    password: ${SPRING_DATASOURCE_PASSWORD:capitec_secret}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+  servlet:
+    multipart:
+      max-file-size: 6MB
+      max-request-size: 30MB
+  mail:
+    host: ${SPRING_MAIL_HOST:localhost}
+    port: ${SPRING_MAIL_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      timeout: 2000ms
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 2
+    consumer:
+      group-id: capitec-dispute-portal-consumer-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      auto-startup: ${APP_KAFKA_ENABLED:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  health:
+    mail:
+      enabled: false
+    redis:
+      enabled: false
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+    display-request-duration: true
+    persist-authorization: true
+
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET:CapitecBankDisputePortalProductionGradeHmacSha256SecretKey2026Secure!}
+    expiration-seconds: 28800
+  frontend-base-url: ${APP_FRONTEND_BASE_URL:http://localhost:4200}
+  storage:
+    attachments-dir: ${APP_ATTACHMENTS_DIR:/app/storage/attachments}
+  mail:
+    from: security-alerts@capitec.test
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:true}
+  idempotency:
+    ttl-seconds: ${APP_IDEMPOTENCY_TTL_SECONDS:300}
+

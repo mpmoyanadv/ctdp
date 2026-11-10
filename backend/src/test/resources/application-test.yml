@@ -1,0 +1,30 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:capitec_test_db;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  mail:
+    host: localhost
+    port: 3025
+  kafka:
+    listener:
+      auto-startup: false
+
+app:
+  jwt:
+    secret: TestSecretKeyForCapitecTransactionsDisputePortalJUnitValidation2026!
+    expiration-seconds: 3600
+  frontend-base-url: http://localhost:4200
+  storage:
+    attachments-dir: target/test-attachments
+  mail:
+    from: security-alerts@capitec.test
+  kafka:
+    enabled: false
+  idempotency:
+    ttl-seconds: 300
+
