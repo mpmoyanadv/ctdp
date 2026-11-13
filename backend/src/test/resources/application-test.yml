@@ -19,6 +19,10 @@ app:
     secret: TestSecretKeyForCapiTransactionsDisputePortalJUnitValidation2026!
     expiration-seconds: 3600
   frontend-base-url: http://localhost:4200
+  cors:
+    allowed-origins: http://localhost:4200
+  security:
+    trusted-proxies: 10.0.0.0/8
   storage:
     attachments-dir: target/test-attachments
   mail:

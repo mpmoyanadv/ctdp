@@ -76,6 +76,12 @@ app:
     secret: ${APP_JWT_SECRET}
     expiration-seconds: 28800
   frontend-base-url: ${APP_FRONTEND_BASE_URL:http://localhost:4200}
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  security:
+    # Comma-separated IPs/CIDRs of trusted reverse proxies allowed to set X-Forwarded-For / X-Real-IP.
+    # Empty by default so direct clients cannot spoof audit IP addresses.
+    trusted-proxies: ${APP_TRUSTED_PROXIES:}
   storage:
     attachments-dir: ${APP_ATTACHMENTS_DIR:/app/storage/attachments}
   mail:
