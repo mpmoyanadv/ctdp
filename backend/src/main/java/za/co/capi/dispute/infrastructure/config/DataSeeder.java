@@ -3,6 +3,7 @@ package za.co.capi.dispute.infrastructure.config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,10 +16,17 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
+/**
+ * Seeds fixed demo accounts, transactions, and sample disputes.
+ * Restricted to {@code demo} and {@code dev} profiles — fixed credentials here
+ * are strictly for local/demo use and are unsuitable for production.
+ */
 @Component
+@Profile({"demo", "dev"})
 public class DataSeeder implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
+    /** Demo-only password; never use in production. */
     public static final String DEFAULT_PASSWORD = "Password123!";
 
     private final AppUserRepository userRepository;
