@@ -69,10 +69,13 @@ services:
       mailhog:
         condition: service_started
     environment:
+      # Local/demo stack only; do not use these credentials or profile in production.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-demo}
       SERVER_PORT: 8080
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/capi_disputes
       SPRING_DATASOURCE_USERNAME: capi
       SPRING_DATASOURCE_PASSWORD: capi_secret
+      APP_JWT_SECRET: ${APP_JWT_SECRET:-DemoOnlyJwtSecretKeyNotForProductionUseCapiDisputePortal2026!}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092

@@ -1,0 +1,13 @@
+# DEMO / LOCAL DEVELOPMENT PROFILE ONLY — DO NOT USE IN PRODUCTION.
+# Production deployments must supply SPRING_DATASOURCE_* and APP_JWT_SECRET
+# via environment variables or a secret manager without enabling the 'demo' profile.
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/capi_disputes}
+    username: ${SPRING_DATASOURCE_USERNAME:capi}
+    password: ${SPRING_DATASOURCE_PASSWORD:capi_secret}
+
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET:DemoOnlyJwtSecretKeyNotForProductionUseCapiDisputePortal2026!}
+

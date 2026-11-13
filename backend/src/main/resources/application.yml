@@ -5,9 +5,9 @@ spring:
   application:
     name: capi-dispute-portal
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/capi_disputes}
-    username: ${SPRING_DATASOURCE_USERNAME:capi}
-    password: ${SPRING_DATASOURCE_PASSWORD:capi_secret}
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -73,7 +73,7 @@ springdoc:
 
 app:
   jwt:
-    secret: ${APP_JWT_SECRET:CapiBankDisputePortalProductionGradeHmacSha256SecretKey2026Secure!}
+    secret: ${APP_JWT_SECRET}
     expiration-seconds: 28800
   frontend-base-url: ${APP_FRONTEND_BASE_URL:http://localhost:4200}
   storage:
