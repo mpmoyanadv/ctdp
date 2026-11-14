@@ -40,6 +40,10 @@ public class BankTransaction {
     @Column(name = "transacted_at", nullable = false)
     private Instant transactedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private TransactionStatus status = TransactionStatus.SETTLED;
+
     public BankTransaction() {
     }
 
@@ -121,6 +125,14 @@ public class BankTransaction {
 
     public void setTransactedAt(Instant transactedAt) {
         this.transactedAt = transactedAt;
+    }
+
+    public TransactionStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(TransactionStatus status) {
+        this.status = status != null ? status : TransactionStatus.SETTLED;
     }
 }
 

@@ -6,7 +6,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "disputes")
+@Table(name = "disputes", indexes = {
+        @Index(name = "idx_disputes_transaction_id", columnList = "transaction_id")
+})
 public class Dispute {
 
     @Id

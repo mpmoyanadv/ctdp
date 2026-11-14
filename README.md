@@ -179,3 +179,12 @@ Enforced centrally in `DisputeTransitionPolicy` and `DisputeService`:
 
 - **Role boundaries:** Only `STAFF` and `ADMIN` can invoke `/status`, `/claim`, or `/delegate`. `CUSTOMER` users can escalate their own disputes (`ESCALATED`), reply to `PENDING_CUSTOMER_ACTION` notes (returning to `IN_REVIEW`), upload evidence, and re-open `REJECTED` disputes. `AFFILIATE` users can only read disputes assigned to their partner domain (with PII masked) and add non-internal notes.
 - **Admin assignment validation:** `POST /api/v1/admin/disputes/{id}/assign` rejects `CUSTOMER` as a target domain and requires any `assigneeUserId` to be unlocked and domain/role compatible (`STAFF`/`ADMIN` in `INTERNAL_CAPI` or `AFFILIATE` in the matching partner domain).
+
+## Transaction Integrity Rules
+
+- **Transaction-backed disputes (`transactionId` supplied):**
+  - Verifies the authenticated customer owns the referenced `BankTransaction` (`403 Forbidden` otherwise).
+  - Requires `BankTransaction.status == SETTLED` (`409 Conflict` for `PENDING` or `REVERSED` transactions).
+  - Prevents duplicate active disputes on the same `transactionId` (`409 Conflict` while a non-terminal dispute exists; `REJECTED` cases can still be re-opened).
+  - Derives `merchantName`, `paymentRail`, and `amount` authoritatively from `BankTransaction`, ignoring any tampered client-supplied values.
+- **Free-form / unlinked disputes (`transactionId` omitted):** Supported for omnichannel or unlinked intakes where a ledger transaction ID is not yet matched; uses client/channel-supplied merchant, rail, and amount with safe defaults.

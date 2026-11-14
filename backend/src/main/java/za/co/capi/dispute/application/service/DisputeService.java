@@ -12,6 +12,7 @@ import za.co.capi.dispute.infrastructure.security.AppUserPrincipal;
 import za.co.capi.dispute.presentation.dto.ApiDtos.*;
 import za.co.capi.dispute.presentation.exception.ApiException;
 
+import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -23,6 +24,11 @@ import java.util.stream.Collectors;
 public class DisputeService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final Set<DisputeStatus> TERMINAL_STATUSES = EnumSet.of(
+            DisputeStatus.RESOLVED,
+            DisputeStatus.REFUNDED,
+            DisputeStatus.REJECTED
+    );
 
     private final DisputeRepository disputeRepository;
     private final DisputeNoteRepository noteRepository;
@@ -157,6 +163,7 @@ public class DisputeService {
         try {
             String merchantName = request.merchantName();
             String paymentRail = request.paymentRail();
+            BigDecimal amount = request.amount();
 
             if (request.transactionId() != null) {
                 BankTransaction tx = transactionRepository.findById(request.transactionId())
@@ -174,8 +181,18 @@ public class DisputeService {
                     );
                     throw ApiException.forbidden("403 Forbidden: Cannot dispute another customer's transaction.");
                 }
+                if (tx.getStatus() == null || !tx.getStatus().isEligibleForDispute()) {
+                    throw ApiException.conflict("409 Conflict: Only SETTLED transactions are eligible for dispute (current status: "
+                            + (tx.getStatus() != null ? tx.getStatus().name() : "UNKNOWN") + ").");
+                }
+                if (disputeRepository.existsByTransactionIdAndStatusNotIn(tx.getId(), TERMINAL_STATUSES)) {
+                    throw ApiException.conflict("409 Conflict: An active dispute already exists for transaction "
+                            + tx.getTransactionReference() + ".");
+                }
+                // Derive authoritative values from the settled ledger transaction
                 merchantName = tx.getMerchantName();
                 paymentRail = tx.getPaymentRail();
+                amount = tx.getAmount();
             }
 
             if (merchantName == null || merchantName.isBlank()) {
@@ -194,7 +211,7 @@ public class DisputeService {
             dispute.setAssignedDomain(UserDomain.INTERNAL_CAPI);
             dispute.setStatus(DisputeStatus.LOGGED);
             dispute.setCategory(request.category());
-            dispute.setAmount(request.amount());
+            dispute.setAmount(amount);
             dispute.setReason(request.reason().trim());
             dispute.setSourceChannel(sourceChannel != null ? sourceChannel : DisputeChannel.WEB_PORTAL);
             dispute.setContactChannelMetadata(contactChannelMetadata);
@@ -677,6 +694,10 @@ public class DisputeService {
         }
         if (original.getStatus() != DisputeStatus.REJECTED) {
             throw ApiException.badRequest("Only disputes in REJECTED status can be re-opened as a linked dispute.");
+        }
+        if (original.getTransactionId() != null
+                && disputeRepository.existsByTransactionIdAndStatusNotIn(original.getTransactionId(), TERMINAL_STATUSES)) {
+            throw ApiException.conflict("409 Conflict: An active dispute already exists for this transaction.");
         }
 
         Dispute linked = new Dispute();

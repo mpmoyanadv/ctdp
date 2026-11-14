@@ -30,7 +30,8 @@ public class TransactionService {
                         t.getCurrency(),
                         t.getCardLastFour(),
                         t.getLocation(),
-                        t.getTransactedAt()
+                        t.getTransactedAt(),
+                        t.getStatus()
                 ))
                 .toList();
     }

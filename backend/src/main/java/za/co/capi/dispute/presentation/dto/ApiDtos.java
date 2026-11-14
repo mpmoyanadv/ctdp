@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Size;
 import za.co.capi.dispute.domain.model.DisputeCategory;
 import za.co.capi.dispute.domain.model.DisputeChannel;
 import za.co.capi.dispute.domain.model.DisputeStatus;
+import za.co.capi.dispute.domain.model.TransactionStatus;
 import za.co.capi.dispute.domain.model.UserDomain;
 import za.co.capi.dispute.domain.model.UserRole;
 
@@ -96,10 +97,11 @@ public final class ApiDtos {
             @Schema(description = "ISO 4217 currency code", example = "ZAR") String currency,
             @Schema(description = "Last 4 digits of card/mandate or payment rail code", example = "SHAP") String cardLastFour,
             @Schema(description = "Geographic or clearing channel location", example = "Instant Interbank Rail") String location,
-            @Schema(description = "UTC timestamp when transaction settled on the ledger") Instant transactedAt
+            @Schema(description = "UTC timestamp when transaction settled on the ledger") Instant transactedAt,
+            @Schema(description = "Ledger settlement status (`SETTLED`, `PENDING`, `REVERSED`)") TransactionStatus status
     ) {}
 
-    @Schema(description = "Request payload to initiate a formal transaction dispute against a settled ledger entry.")
+    @Schema(description = "Request payload to initiate a dispute. When `transactionId` is supplied, merchantName, paymentRail, and amount are derived authoritatively from the settled ledger transaction; when omitted, a free-form unlinked dispute is logged.")
     public record CreateDisputeRequest(
             @Schema(description = "Optional UUID of the disputed ledger transaction") UUID transactionId,
             @Schema(description = "Merchant or counterparty name", example = "Checkers Sixty60") String merchantName,
