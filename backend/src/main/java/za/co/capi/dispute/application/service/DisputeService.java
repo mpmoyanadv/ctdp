@@ -258,6 +258,19 @@ public class DisputeService {
             AppUserPrincipal actor,
             String ipAddress) {
 
+        if (actor.getRole() == UserRole.AFFILIATE) {
+            auditService.logEvent(
+                    actor.getId(),
+                    actor.getEmail(),
+                    "HIGH",
+                    "UNAUTHORIZED_ACCESS_ATTEMPT",
+                    "Dispute",
+                    disputeId.toString(),
+                    ipAddress,
+                    Map.of("severity", "HIGH", "reason", "Affiliate attempted to upload attachments")
+            );
+            throw ApiException.forbidden("403 Forbidden: External affiliates cannot upload dispute evidence.");
+        }
         Dispute dispute = findDisputeAndVerifyBoundary(disputeId, actor, ipAddress, "UPLOAD_ATTACHMENT");
         if (dispute.getStatus().isTerminal()) {
             throw ApiException.conflict("Dispute " + dispute.getDisputeReference() + " is in terminal state (" + dispute.getStatus() + ") and cannot accept file uploads.");
@@ -281,7 +294,7 @@ public class DisputeService {
             throw ApiException.forbidden("Only internal Capi Staff or Admin can claim disputes.");
         }
         Dispute dispute = findDisputeAndVerifyBoundary(disputeId, actor, ipAddress, "CLAIM_DISPUTE");
-        ensureNonTerminal(dispute);
+        DisputeTransitionPolicy.validateTransition(dispute.getStatus(), DisputeStatus.IN_REVIEW, actor.getRole());
 
         dispute.setAssignedUserId(actor.getId());
         dispute.setAssignedDomain(UserDomain.INTERNAL_CAPI);
@@ -367,7 +380,7 @@ public class DisputeService {
             throw ApiException.forbidden("External affiliates cannot escalate internal supervisor queues directly.");
         }
         Dispute dispute = findDisputeAndVerifyBoundary(disputeId, actor, ipAddress, "ESCALATE_DISPUTE");
-        ensureNonTerminal(dispute);
+        DisputeTransitionPolicy.validateTransition(dispute.getStatus(), DisputeStatus.ESCALATED, actor.getRole());
 
         productivityService.closeActiveSessionsForDispute(dispute.getId());
 
@@ -429,7 +442,7 @@ public class DisputeService {
         }
 
         Dispute dispute = findDisputeAndVerifyBoundary(disputeId, actor, ipAddress, "DELEGATE_DISPUTE");
-        ensureNonTerminal(dispute);
+        DisputeTransitionPolicy.validateTransition(dispute.getStatus(), DisputeStatus.PENDING_EXTERNAL_REVIEW, actor.getRole());
 
         productivityService.closeActiveSessionsForDispute(dispute.getId());
 
@@ -480,7 +493,7 @@ public class DisputeService {
 
     @Transactional
     public DisputeDetailDto updateStatus(UUID disputeId, StatusUpdateRequest request, AppUserPrincipal actor, String ipAddress) {
-        if (actor.getRole() == UserRole.CUSTOMER) {
+        if (actor.getRole() != UserRole.STAFF && actor.getRole() != UserRole.ADMIN) {
             auditService.logEvent(
                     actor.getId(),
                     actor.getEmail(),
@@ -489,16 +502,23 @@ public class DisputeService {
                     "Dispute",
                     disputeId.toString(),
                     ipAddress,
-                    Map.of("severity", "HIGH", "reason", "Customer attempted privileged status update")
+                    Map.of(
+                            "severity", "HIGH",
+                            "actorRole", actor.getRole().name(),
+                            "reason", "Unauthorized role attempted privileged status update"
+                    )
             );
-            throw ApiException.forbidden("403 Forbidden: Customers cannot directly modify investigation status.");
+            throw ApiException.forbidden("403 Forbidden: Only internal Capi Staff or Admin may update investigation status.");
         }
 
         Dispute dispute = findDisputeAndVerifyBoundary(disputeId, actor, ipAddress, "UPDATE_STATUS");
-        ensureNonTerminal(dispute);
-
         DisputeStatus newStatus = request.status();
+        DisputeTransitionPolicy.validateTransition(dispute.getStatus(), newStatus, actor.getRole());
+
         dispute.setStatus(newStatus);
+        if (newStatus == DisputeStatus.IN_REVIEW && dispute.getAssignedDomain() != UserDomain.INTERNAL_CAPI) {
+            dispute.setAssignedDomain(UserDomain.INTERNAL_CAPI);
+        }
         if (request.resolutionSummary() != null && !request.resolutionSummary().isBlank()) {
             dispute.setResolutionSummary(request.resolutionSummary().trim());
         }
@@ -556,27 +576,53 @@ public class DisputeService {
 
     @Transactional
     public DisputeDetailDto adminAssignDispute(UUID disputeId, AssignDisputeRequest request, AppUserPrincipal admin, String ipAddress) {
+        if (admin.getRole() != UserRole.ADMIN) {
+            throw ApiException.forbidden("403 Forbidden: Only ADMIN supervisors can assign disputes.");
+        }
         Dispute dispute = disputeRepository.findById(disputeId)
                 .orElseThrow(() -> ApiException.notFound("Dispute not found."));
         ensureNonTerminal(dispute);
 
+        UserDomain targetDomain = request.assignedDomain() != null
+                ? request.assignedDomain()
+                : dispute.getAssignedDomain();
+        if (targetDomain == UserDomain.CUSTOMER) {
+            throw ApiException.badRequest("Disputes cannot be assigned to the CUSTOMER domain.");
+        }
+
+        if (request.assigneeUserId() != null) {
+            AppUser assignee = userRepository.findById(request.assigneeUserId())
+                    .orElseThrow(() -> ApiException.notFound("Assignee user not found."));
+            if (assignee.isLocked()) {
+                throw ApiException.badRequest("Cannot assign dispute to a locked user account.");
+            }
+            validateAssigneeCompatibility(assignee, targetDomain);
+        }
+
+        DisputeStatus targetStatus = request.status();
+        if (targetStatus == null) {
+            if (targetDomain == UserDomain.PARTNER_BANKSERV || targetDomain == UserDomain.PARTNER_MERCHANT) {
+                targetStatus = DisputeStatus.PENDING_EXTERNAL_REVIEW;
+            } else if (request.assigneeUserId() != null) {
+                targetStatus = DisputeStatus.IN_REVIEW;
+            }
+        }
+        if (targetStatus != null && targetStatus != dispute.getStatus()) {
+            DisputeTransitionPolicy.validateTransition(dispute.getStatus(), targetStatus, admin.getRole());
+        }
+
         productivityService.closeActiveSessionsForDispute(dispute.getId());
 
-        if (request.assignedDomain() != null) {
-            dispute.setAssignedDomain(request.assignedDomain());
-        }
+        dispute.setAssignedDomain(targetDomain);
         dispute.setAssignedUserId(request.assigneeUserId());
 
-        if (request.status() != null) {
-            dispute.setStatus(request.status());
-            if (request.status().isTerminal()) {
+        if (targetStatus != null) {
+            dispute.setStatus(targetStatus);
+            if (targetStatus.isTerminal()) {
                 dispute.setResolvedAt(Instant.now());
+            } else if (targetStatus == DisputeStatus.IN_REVIEW && request.assigneeUserId() != null) {
+                productivityService.startWorkSession(dispute.getId(), request.assigneeUserId());
             }
-        } else if (dispute.getAssignedDomain() == UserDomain.PARTNER_BANKSERV || dispute.getAssignedDomain() == UserDomain.PARTNER_MERCHANT) {
-            dispute.setStatus(DisputeStatus.PENDING_EXTERNAL_REVIEW);
-        } else if (request.assigneeUserId() != null) {
-            dispute.setStatus(DisputeStatus.IN_REVIEW);
-            productivityService.startWorkSession(dispute.getId(), request.assigneeUserId());
         }
 
         disputeRepository.save(dispute);
@@ -598,6 +644,23 @@ public class DisputeService {
         );
 
         return buildDetailDto(dispute, admin.getRole());
+    }
+
+    private void validateAssigneeCompatibility(AppUser assignee, UserDomain targetDomain) {
+        if (targetDomain == UserDomain.INTERNAL_CAPI) {
+            if ((assignee.getRole() != UserRole.STAFF && assignee.getRole() != UserRole.ADMIN)
+                    || assignee.getUserDomain() != UserDomain.INTERNAL_CAPI) {
+                throw ApiException.badRequest("Internal assignments require an active STAFF or ADMIN user in INTERNAL_CAPI");
+            }
+            return;
+        }
+        if (targetDomain == UserDomain.PARTNER_BANKSERV || targetDomain == UserDomain.PARTNER_MERCHANT) {
+            if (assignee.getRole() != UserRole.AFFILIATE || assignee.getUserDomain() != targetDomain) {
+                throw ApiException.badRequest("Partner assignments require an active AFFILIATE user in " + targetDomain.name());
+            }
+            return;
+        }
+        throw ApiException.badRequest("Unsupported target domain for dispute assignment: " + targetDomain.name());
     }
 
     @Transactional

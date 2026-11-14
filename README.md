@@ -148,12 +148,12 @@ Coverage includes:
 | `GET /api/v1/disputes` | Authenticated | List disputes scoped by role/domain |
 | `POST /api/v1/disputes` | `CUSTOMER` | Create dispute (JSON or `multipart/form-data`, Redis idempotency locked) |
 | `GET /api/v1/disputes/{id}` | Authenticated | Get dispute details, notes, attachments, and lineage |
-| `POST /api/v1/disputes/{id}/attachments` | Authenticated | Upload additional evidence files (blocked in terminal states) |
+| `POST /api/v1/disputes/{id}/attachments` | `CUSTOMER`, `STAFF`, `ADMIN` | Upload additional evidence files (blocked in terminal states) |
 | `POST /api/v1/disputes/{id}/claim` | `STAFF`, `ADMIN` | Claim dispute (`IN_REVIEW`) and start work session timer |
 | `POST /api/v1/disputes/{id}/notes` | Authenticated | Add note (can trigger `PENDING_CUSTOMER_ACTION`) |
 | `POST /api/v1/disputes/{id}/escalate` | `CUSTOMER`, `STAFF`, `ADMIN` | Escalate dispute to supervisor queue |
 | `POST /api/v1/disputes/{id}/delegate` | `STAFF`, `ADMIN` | Delegate dispute to `PARTNER_BANKSERV` or `PARTNER_MERCHANT` |
-| `PATCH /api/v1/disputes/{id}/status` | `STAFF`, `AFFILIATE`, `ADMIN` | Transition dispute status |
+| `PATCH /api/v1/disputes/{id}/status` | `STAFF`, `ADMIN` | Transition dispute status |
 | `POST /api/v1/disputes/{id}/reopen` | `CUSTOMER` | Re-open a `REJECTED` dispute as a linked case |
 | `GET /api/v1/admin/audit-logs` | `ADMIN` | View audit logs |
 | `GET /api/v1/admin/audit-logs/export` | `ADMIN` | Export audit logs as CSV |
@@ -163,3 +163,19 @@ Coverage includes:
 | `POST /api/v1/admin/disputes/{id}/assign` | `ADMIN` | Assign/reassign dispute to investigator or partner domain |
 | `POST /api/v1/omnichannel/sms-webhook` | Authenticated | Simulate inbound SMS/WhatsApp dispute intake & auto-reply |
 | `POST /api/v1/omnichannel/voice-call` | Authenticated | Simulate Call Centre / IVR voice call dispute intake & transcript |
+
+## Dispute Status Transition Policy
+
+Enforced centrally in `DisputeTransitionPolicy` and `DisputeService`:
+
+| Current Status | Allowed Next Statuses |
+| :--- | :--- |
+| `LOGGED` | `IN_REVIEW`, `PENDING_CUSTOMER_ACTION`, `PENDING_EXTERNAL_REVIEW`, `ESCALATED`, `REJECTED` |
+| `IN_REVIEW` | `PENDING_CUSTOMER_ACTION`, `PENDING_EXTERNAL_REVIEW`, `ESCALATED`, `RESOLVED`, `REFUNDED`, `REJECTED` |
+| `PENDING_CUSTOMER_ACTION` | `IN_REVIEW`, `ESCALATED`, `RESOLVED`, `REFUNDED`, `REJECTED` |
+| `PENDING_EXTERNAL_REVIEW` | `IN_REVIEW`, `ESCALATED`, `RESOLVED`, `REFUNDED`, `REJECTED` |
+| `ESCALATED` | `IN_REVIEW`, `PENDING_CUSTOMER_ACTION`, `PENDING_EXTERNAL_REVIEW`, `RESOLVED`, `REFUNDED`, `REJECTED` |
+| `RESOLVED`, `REFUNDED`, `REJECTED` | Terminal — no transitions permitted (`REJECTED` may be re-opened as a new linked `LOGGED` dispute by the owning `CUSTOMER`) |
+
+- **Role boundaries:** Only `STAFF` and `ADMIN` can invoke `/status`, `/claim`, or `/delegate`. `CUSTOMER` users can escalate their own disputes (`ESCALATED`), reply to `PENDING_CUSTOMER_ACTION` notes (returning to `IN_REVIEW`), upload evidence, and re-open `REJECTED` disputes. `AFFILIATE` users can only read disputes assigned to their partner domain (with PII masked) and add non-internal notes.
+- **Admin assignment validation:** `POST /api/v1/admin/disputes/{id}/assign` rejects `CUSTOMER` as a target domain and requires any `assigneeUserId` to be unlocked and domain/role compatible (`STAFF`/`ADMIN` in `INTERNAL_CAPI` or `AFFILIATE` in the matching partner domain).
