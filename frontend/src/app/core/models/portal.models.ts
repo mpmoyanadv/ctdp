@@ -38,6 +38,12 @@ export interface AuthResponse {
   user: UserProfile;
 }
 
+export interface FraudReportPreviewResponse {
+  valid: boolean;
+  maskedEmail: string;
+  message: string;
+}
+
 export interface FraudReportResponse {
   locked: boolean;
   email: string;

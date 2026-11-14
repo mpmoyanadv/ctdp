@@ -54,6 +54,13 @@ public final class ApiDtos {
             @Schema(description = "Authenticated principal profile") UserProfileDto user
     ) {}
 
+    @Schema(description = "Read-only token validation payload for the fraud lockdown confirmation screen.")
+    public record FraudReportPreviewResponse(
+            @Schema(description = "Whether the fraud report token is valid and pending confirmation", example = "true") boolean valid,
+            @Schema(description = "Masked email address associated with the alert token", example = "cu***@capi.test") String maskedEmail,
+            @Schema(description = "Status message for the confirmation screen") String message
+    ) {}
+
     @Schema(description = "Confirmation payload returned after executing emergency fraud lockdown and OTP dispatch.")
     public record FraudReportResponse(
             @Schema(description = "Indicates whether the account was locked and active JWTs revoked", example = "true") boolean locked,

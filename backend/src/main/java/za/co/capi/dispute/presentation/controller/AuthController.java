@@ -83,22 +83,35 @@ public class AuthController {
     }
 
     @Operation(
-            summary = "Browser GET redirect handler for email fraud lockdown link",
-            description = "Allows clicking the fraud lockdown link directly from an email client (`GET /api/v1/auth/report-fraud?token=...`), locking the account and redirecting (`302 Found`) to the Angular Fraud Lockdown screen."
+            summary = "Validate fraud alert token without locking the account",
+            description = "Read-only check used by the frontend confirmation screen before the user explicitly confirms emergency account lockdown."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "302", description = "Account locked; redirecting browser to frontend lockdown confirmation page"),
-            @ApiResponse(responseCode = "400", description = "Invalid or expired fraud alert token")
+            @ApiResponse(responseCode = "200", description = "Fraud alert token is valid and awaiting explicit confirmation"),
+            @ApiResponse(responseCode = "400", description = "Invalid, expired, or already-used fraud alert token")
+    })
+    @GetMapping("/report-fraud/preview")
+    public ResponseEntity<FraudReportPreviewResponse> previewFraudReport(
+            @Parameter(description = "Single-use cryptographic fraud token from the login alert email", required = true)
+            @RequestParam("token") String token) {
+        return ResponseEntity.ok(authService.previewFraudReportToken(token));
+    }
+
+    @Operation(
+            summary = "Browser GET redirect handler for email fraud lockdown link (read-only)",
+            description = "Validates the fraud token without locking the account and redirects (`302 Found`) to the Angular confirmation screen where an explicit POST action is required. Safe against email security scanners."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "302", description = "Redirecting browser to frontend fraud confirmation page (account not yet locked)"),
+            @ApiResponse(responseCode = "400", description = "Invalid, expired, or already-used fraud alert token")
     })
     @GetMapping("/report-fraud")
     public ResponseEntity<Void> reportFraudGetRedirect(
             @Parameter(description = "Single-use cryptographic fraud token from the login alert email", required = true)
-            @RequestParam("token") String token,
-            HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
-        FraudReportResponse result = authService.reportFraudAndLockAccount(token, ip);
-        String redirectUrl = frontendBaseUrl + "/fraud-report?locked=true&email="
-                + URLEncoder.encode(result.email(), StandardCharsets.UTF_8);
+            @RequestParam("token") String token) {
+        authService.previewFraudReportToken(token);
+        String redirectUrl = frontendBaseUrl + "/fraud-report?token="
+                + URLEncoder.encode(token.trim(), StandardCharsets.UTF_8);
         return ResponseEntity.status(HttpStatus.FOUND)
                 .header(HttpHeaders.LOCATION, URI.create(redirectUrl).toString())
                 .build();

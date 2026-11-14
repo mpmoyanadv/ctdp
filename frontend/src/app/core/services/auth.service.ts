@@ -2,7 +2,7 @@ import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
-import { AuthResponse, FraudReportResponse, UserProfile } from '../models/portal.models';
+import { AuthResponse, FraudReportPreviewResponse, FraudReportResponse, UserProfile } from '../models/portal.models';
 
 const TOKEN_KEY = 'capi_portal_token';
 const USER_KEY = 'capi_portal_user';
@@ -23,6 +23,12 @@ export class AuthService {
         localStorage.setItem(USER_KEY, JSON.stringify(res.user));
         this.userSignal.set(res.user);
       })
+    );
+  }
+
+  previewFraudReport(token: string): Observable<FraudReportPreviewResponse> {
+    return this.http.get<FraudReportPreviewResponse>(
+      `/api/v1/auth/report-fraud/preview?token=${encodeURIComponent(token)}`
     );
   }
 

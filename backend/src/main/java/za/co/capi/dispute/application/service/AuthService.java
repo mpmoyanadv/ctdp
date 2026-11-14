@@ -34,6 +34,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final NotificationEmailService notificationEmailService;
     private final AuditService auditService;
+    private final PiiMaskingService piiMaskingService;
 
     public AuthService(
             AppUserRepository appUserRepository,
@@ -42,7 +43,8 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             JwtTokenProvider jwtTokenProvider,
             NotificationEmailService notificationEmailService,
-            AuditService auditService) {
+            AuditService auditService,
+            PiiMaskingService piiMaskingService) {
         this.appUserRepository = appUserRepository;
         this.fraudAlertTokenRepository = fraudAlertTokenRepository;
         this.passwordResetOtpRepository = passwordResetOtpRepository;
@@ -50,6 +52,7 @@ public class AuthService {
         this.jwtTokenProvider = jwtTokenProvider;
         this.notificationEmailService = notificationEmailService;
         this.auditService = auditService;
+        this.piiMaskingService = piiMaskingService;
     }
 
     @Transactional
@@ -121,6 +124,32 @@ public class AuthService {
                 "Bearer",
                 jwtTokenProvider.getExpirationSeconds(),
                 toUserProfile(user)
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public FraudReportPreviewResponse previewFraudReportToken(String token) {
+        if (token == null || token.isBlank()) {
+            throw ApiException.badRequest("Fraud report token is required.");
+        }
+
+        FraudAlertToken alertToken = fraudAlertTokenRepository.findByToken(token.trim())
+                .orElseThrow(() -> ApiException.badRequest("Invalid or unknown fraud report token."));
+
+        if (alertToken.getExpiresAt().isBefore(Instant.now())) {
+            throw ApiException.badRequest("Fraud report token has expired.");
+        }
+        if (alertToken.isUsed()) {
+            throw ApiException.badRequest("Fraud report token has already been used.");
+        }
+
+        AppUser user = appUserRepository.findById(alertToken.getUserId())
+                .orElseThrow(() -> ApiException.notFound("User account not found."));
+
+        return new FraudReportPreviewResponse(
+                true,
+                piiMaskingService.maskEmail(user.getEmail()),
+                "Please confirm that you want to lock your account and terminate all active sessions."
         );
     }
 

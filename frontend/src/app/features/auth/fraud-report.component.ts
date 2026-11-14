@@ -18,7 +18,27 @@ import { AuthService } from '../../core/services/auth.service';
         <div class="p-7">
           @if (processing) {
             <div class="py-8 text-center">
-              <p class="text-base font-semibold text-slate-800">Securing your account and terminating active sessions...</p>
+              <p class="text-base font-semibold text-slate-800">{{ processingMessage }}</p>
+            </div>
+          } @else if (awaitingConfirmation) {
+            <div id="fraud-confirm-screen" class="space-y-4">
+              <div class="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900">
+                <h2 class="font-bold text-lg text-amber-900 mb-1">Confirm Emergency Account Lockdown</h2>
+                <p class="text-sm">
+                  You are about to lock the account <strong>{{ maskedEmail }}</strong> and revoke all active sessions.
+                  A 6-digit verification code will be sent to your email so you can reset your password.
+                </p>
+              </div>
+              <div class="pt-2 flex flex-wrap gap-3">
+                <button id="confirm-fraud-lock-btn" type="button" (click)="confirmLockdown()"
+                        class="px-5 py-2.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-semibold transition">
+                  Confirm &amp; Lock Account
+                </button>
+                <a routerLink="/login"
+                   class="px-5 py-2.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 text-sm font-semibold transition">
+                  Cancel
+                </a>
+              </div>
             </div>
           } @else if (lockedSuccess) {
             <div id="fraud-locked-confirmation" class="space-y-4">
@@ -59,43 +79,59 @@ import { AuthService } from '../../core/services/auth.service';
 })
 export class FraudReportComponent implements OnInit {
   processing = true;
+  processingMessage = 'Validating security alert link...';
+  awaitingConfirmation = false;
   lockedSuccess = false;
+  maskedEmail = '';
   lockedEmail = '';
   message = '';
   errorMessage = '';
+  private token = '';
 
   constructor(private route: ActivatedRoute, private authService: AuthService) {}
 
   ngOnInit(): void {
     this.route.queryParams.subscribe((params) => {
       const token = params['token'];
-      const alreadyLocked = params['locked'] === 'true';
-      if (alreadyLocked) {
-        this.authService.clearSessionOnly();
-        this.processing = false;
-        this.lockedSuccess = true;
-        this.lockedEmail = params['email'] || '';
-        this.message = 'Your Capi account is now locked and a 6-digit verification code has been emailed to you.';
-        return;
-      }
       if (!token) {
         this.processing = false;
         this.errorMessage = 'Missing security token parameter.';
         return;
       }
 
-      this.authService.reportFraud(token).subscribe({
+      this.token = token;
+      this.authService.previewFraudReport(token).subscribe({
         next: (res) => {
           this.processing = false;
-          this.lockedSuccess = res.locked;
-          this.lockedEmail = res.email;
-          this.message = res.message;
+          this.awaitingConfirmation = res.valid;
+          this.maskedEmail = res.maskedEmail;
         },
         error: (err) => {
           this.processing = false;
           this.errorMessage = err.error?.message || 'Fraud report link is invalid or expired.';
         }
       });
+    });
+  }
+
+  confirmLockdown(): void {
+    if (!this.token) {
+      return;
+    }
+    this.awaitingConfirmation = false;
+    this.processing = true;
+    this.processingMessage = 'Securing your account and terminating active sessions...';
+    this.authService.reportFraud(this.token).subscribe({
+      next: (res) => {
+        this.processing = false;
+        this.lockedSuccess = res.locked;
+        this.lockedEmail = res.email;
+        this.message = res.message;
+      },
+      error: (err) => {
+        this.processing = false;
+        this.errorMessage = err.error?.message || 'Fraud report link is invalid or expired.';
+      }
     });
   }
 }
