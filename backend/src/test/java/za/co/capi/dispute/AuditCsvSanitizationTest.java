@@ -2,6 +2,8 @@ package za.co.capi.dispute;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import za.co.capi.dispute.application.service.AuditService;
 import za.co.capi.dispute.domain.model.AuditLog;
 import za.co.capi.dispute.domain.repository.AuditLogRepository;
@@ -12,6 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -49,7 +52,7 @@ class AuditCsvSanitizationTest {
         entry.setIpAddress("-127.0.0.1");
         entry.setMetadata("{\"note\":\"line1\nline2,comma\"}");
 
-        when(repo.findAllByOrderByTimestampDesc()).thenReturn(List.of(entry));
+        when(repo.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(entry)));
 
         String csv = service.exportImmutableCsv();
         String[] lines = csv.split("\n", 2);

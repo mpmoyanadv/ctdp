@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import org.springframework.data.domain.Page;
 import za.co.capi.dispute.domain.model.DisputeCategory;
 import za.co.capi.dispute.domain.model.DisputeChannel;
 import za.co.capi.dispute.domain.model.DisputeStatus;
@@ -389,4 +390,27 @@ public final class ApiDtos {
             @Schema(description = "Recorded call transcript or gateway parsing summary") String channelTranscript,
             Instant processedAt
     ) {}
+
+    @Schema(description = "Standard paginated response envelope.")
+    public record PageResponseDto<T>(
+            List<T> content,
+            int page,
+            int size,
+            long totalElements,
+            int totalPages,
+            boolean first,
+            boolean last
+    ) {
+        public static <T> PageResponseDto<T> from(Page<T> pageData) {
+            return new PageResponseDto<>(
+                    pageData.getContent(),
+                    pageData.getNumber(),
+                    pageData.getSize(),
+                    pageData.getTotalElements(),
+                    pageData.getTotalPages(),
+                    pageData.isFirst(),
+                    pageData.isLast()
+            );
+        }
+    }
 }

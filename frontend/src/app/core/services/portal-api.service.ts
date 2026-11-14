@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { map, Observable } from 'rxjs';
 import {
   AuditLogEntry,
   BankTransaction,
@@ -10,6 +10,7 @@ import {
   DisputeSummary,
   DisputeAttachment,
   OmnichannelSimulationResponse,
+  PageResponse,
   ProductivityReport,
   SmsWebhookSimulationRequest,
   UserDomain,
@@ -25,8 +26,16 @@ export class PortalApiService {
     return this.http.get<BankTransaction[]>('/api/v1/transactions');
   }
 
-  getDisputes(): Observable<DisputeSummary[]> {
-    return this.http.get<DisputeSummary[]>('/api/v1/disputes');
+  getDisputesPage(page = 0, size = 50, status?: DisputeStatus): Observable<PageResponse<DisputeSummary>> {
+    let params = new HttpParams().set('page', page).set('size', size);
+    if (status) {
+      params = params.set('status', status);
+    }
+    return this.http.get<PageResponse<DisputeSummary>>('/api/v1/disputes', { params });
+  }
+
+  getDisputes(page = 0, size = 50, status?: DisputeStatus): Observable<DisputeSummary[]> {
+    return this.getDisputesPage(page, size, status).pipe(map((res) => res.content));
   }
 
   getDisputeById(id: string): Observable<DisputeDetail> {
@@ -106,9 +115,16 @@ export class PortalApiService {
     return this.http.get<ProductivityReport>('/api/v1/admin/reports/productivity');
   }
 
-  getAuditLogs(eventType?: string): Observable<AuditLogEntry[]> {
-    const query = eventType ? `?eventType=${encodeURIComponent(eventType)}` : '';
-    return this.http.get<AuditLogEntry[]>(`/api/v1/admin/audit-logs${query}`);
+  getAuditLogsPage(eventType?: string, page = 0, size = 100): Observable<PageResponse<AuditLogEntry>> {
+    let params = new HttpParams().set('page', page).set('size', size);
+    if (eventType) {
+      params = params.set('eventType', eventType);
+    }
+    return this.http.get<PageResponse<AuditLogEntry>>('/api/v1/admin/audit-logs', { params });
+  }
+
+  getAuditLogs(eventType?: string, page = 0, size = 100): Observable<AuditLogEntry[]> {
+    return this.getAuditLogsPage(eventType, page, size).pipe(map((res) => res.content));
   }
 
   exportAuditCsv(): Observable<Blob> {

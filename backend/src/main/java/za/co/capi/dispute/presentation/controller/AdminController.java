@@ -72,10 +72,12 @@ public class AdminController {
             description = "Returns chronological `AuditLog` entries, optionally filtered by `eventType` (e.g., `UNAUTHORIZED_ACCESS_ATTEMPT`, `ACCOUNT_LOCKED_FRAUD_REPORTED`)."
     )
     @GetMapping("/audit-logs")
-    public ResponseEntity<List<AuditLogDto>> getAuditLogs(
+    public ResponseEntity<PageResponseDto<AuditLogDto>> getAuditLogs(
             @Parameter(description = "Optional eventType filter (e.g. UNAUTHORIZED_ACCESS_ATTEMPT)")
-            @RequestParam(value = "eventType", required = false) String eventType) {
-        return ResponseEntity.ok(auditService.getAllLogs(eventType));
+            @RequestParam(value = "eventType", required = false) String eventType,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "50") int size) {
+        return ResponseEntity.ok(auditService.getLogsPage(eventType, page, size));
     }
 
     @Operation(

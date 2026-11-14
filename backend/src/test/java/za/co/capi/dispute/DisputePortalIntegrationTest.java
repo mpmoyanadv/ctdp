@@ -182,7 +182,7 @@ class DisputePortalIntegrationTest {
                         .header("Authorization", "Bearer " + staffToken))
                 .andExpect(status().isOk())
                 .andReturn();
-        JsonNode listNode = objectMapper.readTree(allDisputesRes.getResponse().getContentAsString());
+        JsonNode listNode = objectMapper.readTree(allDisputesRes.getResponse().getContentAsString()).get("content");
         String payshapId = null;
         for (JsonNode n : listNode) {
             if ("DSP-2026-10042".equals(n.get("disputeReference").asText())) {

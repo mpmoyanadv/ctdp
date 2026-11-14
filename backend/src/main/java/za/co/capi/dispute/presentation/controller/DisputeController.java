@@ -20,6 +20,7 @@ import za.co.capi.dispute.application.service.AuditService;
 import za.co.capi.dispute.application.service.DisputeService;
 import za.co.capi.dispute.domain.model.DisputeAttachment;
 import za.co.capi.dispute.domain.model.DisputeCategory;
+import za.co.capi.dispute.domain.model.DisputeStatus;
 import za.co.capi.dispute.infrastructure.config.OpenApiConfig;
 import za.co.capi.dispute.infrastructure.security.AppUserPrincipal;
 import za.co.capi.dispute.presentation.dto.ApiDtos.*;
@@ -54,9 +55,12 @@ public class DisputeController {
             @ApiResponse(responseCode = "200", description = "Scoped list of active and historic disputes returned")
     })
     @GetMapping
-    public ResponseEntity<List<DisputeSummaryDto>> listDisputes(
-            @AuthenticationPrincipal AppUserPrincipal principal) {
-        return ResponseEntity.ok(disputeService.listDisputesForActor(principal));
+    public ResponseEntity<PageResponseDto<DisputeSummaryDto>> listDisputes(
+            @AuthenticationPrincipal AppUserPrincipal principal,
+            @RequestParam(value = "status", required = false) DisputeStatus status,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        return ResponseEntity.ok(disputeService.listDisputesForActor(principal, status, page, size));
     }
 
     @Operation(

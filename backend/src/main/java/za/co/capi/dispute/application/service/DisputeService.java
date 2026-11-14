@@ -1,6 +1,10 @@
 package za.co.capi.dispute.application.service;
 
 import org.springframework.core.io.Resource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -71,21 +75,54 @@ public class DisputeService {
     }
 
     @Transactional(readOnly = true)
-    public List<DisputeSummaryDto> listDisputesForActor(AppUserPrincipal actor) {
-        List<Dispute> disputes = switch (actor.getRole()) {
-            case CUSTOMER -> disputeRepository.findByCustomerIdOrderByCreatedAtDesc(actor.getId());
-            case AFFILIATE -> disputeRepository.findByAssignedDomainOrderByCreatedAtDesc(actor.getUserDomain());
-            case STAFF, ADMIN -> disputeRepository.findAllByOrderByCreatedAtDesc();
+    public PageResponseDto<DisputeSummaryDto> listDisputesForActor(
+            AppUserPrincipal actor,
+            DisputeStatus statusFilter,
+            int page,
+            int size) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 100);
+        Pageable pageable = PageRequest.of(safePage, safeSize,
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
+
+        Page<Dispute> disputesPage = switch (actor.getRole()) {
+            case CUSTOMER -> statusFilter != null
+                    ? disputeRepository.findByCustomerIdAndStatus(actor.getId(), statusFilter, pageable)
+                    : disputeRepository.findByCustomerId(actor.getId(), pageable);
+            case AFFILIATE -> statusFilter != null
+                    ? disputeRepository.findByAssignedDomainAndStatus(actor.getUserDomain(), statusFilter, pageable)
+                    : disputeRepository.findByAssignedDomain(actor.getUserDomain(), pageable);
+            case STAFF, ADMIN -> statusFilter != null
+                    ? disputeRepository.findByStatus(statusFilter, pageable)
+                    : disputeRepository.findAll(pageable);
         };
 
-        Map<UUID, AppUser> usersById = userRepository.findAll().stream()
-                .collect(Collectors.toMap(AppUser::getId, u -> u));
-        Map<UUID, String> refById = disputeRepository.findAll().stream()
-                .collect(Collectors.toMap(Dispute::getId, Dispute::getDisputeReference));
+        List<Dispute> pageContent = disputesPage.getContent();
+        Set<UUID> userIds = new HashSet<>();
+        Set<UUID> originalIds = new HashSet<>();
+        for (Dispute d : pageContent) {
+            if (d.getCustomerId() != null) {
+                userIds.add(d.getCustomerId());
+            }
+            if (d.getAssignedUserId() != null) {
+                userIds.add(d.getAssignedUserId());
+            }
+            if (d.getOriginalDisputeId() != null) {
+                originalIds.add(d.getOriginalDisputeId());
+            }
+        }
 
-        return disputes.stream()
-                .map(d -> toSummaryDto(d, actor.getRole(), usersById, refById))
-                .toList();
+        Map<UUID, AppUser> usersById = userIds.isEmpty()
+                ? Map.of()
+                : userRepository.findAllById(userIds).stream()
+                        .collect(Collectors.toMap(AppUser::getId, u -> u));
+        Map<UUID, String> refById = originalIds.isEmpty()
+                ? Map.of()
+                : disputeRepository.findAllById(originalIds).stream()
+                        .collect(Collectors.toMap(Dispute::getId, Dispute::getDisputeReference));
+
+        Page<DisputeSummaryDto> dtoPage = disputesPage.map(d -> toSummaryDto(d, actor.getRole(), usersById, refById));
+        return PageResponseDto.from(dtoPage);
     }
 
     @Transactional(readOnly = true)

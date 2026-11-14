@@ -5,6 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -13,6 +17,7 @@ import za.co.capi.dispute.domain.model.AuditLog;
 import za.co.capi.dispute.domain.repository.AuditLogRepository;
 import za.co.capi.dispute.infrastructure.messaging.KafkaEventService;
 import za.co.capi.dispute.presentation.dto.ApiDtos.AuditLogDto;
+import za.co.capi.dispute.presentation.dto.ApiDtos.PageResponseDto;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -86,31 +91,38 @@ public class AuditService {
         return saved;
     }
 
-    @Transactional(readOnly = true)
-    public List<AuditLogDto> getAllLogs(String eventTypeFilter) {
-        List<AuditLog> logs = (eventTypeFilter != null && !eventTypeFilter.isBlank())
-                ? auditLogRepository.findByEventTypeOrderByTimestampDesc(eventTypeFilter.trim())
-                : auditLogRepository.findAllByOrderByTimestampDesc();
+    private static final int MAX_CSV_EXPORT_ROWS = 10_000;
 
-        return logs.stream()
-                .map(a -> new AuditLogDto(
-                        a.getId(),
-                        a.getActorId(),
-                        a.getActorEmail(),
-                        a.getSeverity(),
-                        a.getEventType(),
-                        a.getEntityName(),
-                        a.getEntityId(),
-                        a.getIpAddress(),
-                        a.getMetadata(),
-                        a.getTimestamp()
-                ))
-                .toList();
+    @Transactional(readOnly = true)
+    public PageResponseDto<AuditLogDto> getLogsPage(String eventTypeFilter, int page, int size) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 100);
+        Pageable pageable = PageRequest.of(safePage, safeSize,
+                Sort.by(Sort.Order.desc("timestamp"), Sort.Order.desc("id")));
+
+        Page<AuditLog> logsPage = (eventTypeFilter != null && !eventTypeFilter.isBlank())
+                ? auditLogRepository.findByEventType(eventTypeFilter.trim(), pageable)
+                : auditLogRepository.findAll(pageable);
+
+        return PageResponseDto.from(logsPage.map(a -> new AuditLogDto(
+                a.getId(),
+                a.getActorId(),
+                a.getActorEmail(),
+                a.getSeverity(),
+                a.getEventType(),
+                a.getEntityName(),
+                a.getEntityId(),
+                a.getIpAddress(),
+                a.getMetadata(),
+                a.getTimestamp()
+        )));
     }
 
     @Transactional(readOnly = true)
     public String exportImmutableCsv() {
-        List<AuditLog> logs = auditLogRepository.findAllByOrderByTimestampDesc();
+        Pageable exportLimit = PageRequest.of(0, MAX_CSV_EXPORT_ROWS,
+                Sort.by(Sort.Order.desc("timestamp"), Sort.Order.desc("id")));
+        List<AuditLog> logs = auditLogRepository.findAll(exportLimit).getContent();
         StringBuilder sb = new StringBuilder();
         sb.append("id,timestamp,severity,event_type,actor_id,actor_email,entity_name,entity_id,ip_address,metadata\n");
         for (AuditLog log : logs) {
