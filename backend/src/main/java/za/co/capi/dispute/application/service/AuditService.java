@@ -199,10 +199,25 @@ public class AuditService {
     }
 
     private String csvCell(String value) {
+        return sanitizeCsvCell(value);
+    }
+
+    /**
+     * Sanitizes a CSV cell against spreadsheet formula injection (=, +, -, @, tab, CR)
+     * before applying RFC-4180 quoting.
+     */
+    public static String sanitizeCsvCell(String value) {
         if (value == null) {
             return "";
         }
-        String escaped = value.replace("\"", "\"\"");
+        String safeValue = value;
+        if (!safeValue.isEmpty()) {
+            char first = safeValue.charAt(0);
+            if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r') {
+                safeValue = "'" + safeValue;
+            }
+        }
+        String escaped = safeValue.replace("\"", "\"\"");
         if (escaped.contains(",") || escaped.contains("\"") || escaped.contains("\n") || escaped.contains("\r")) {
             return "\"" + escaped + "\"";
         }

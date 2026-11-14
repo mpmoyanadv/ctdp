@@ -1,10 +1,16 @@
 package za.co.capi.dispute.domain.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Immutable;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * Application-level append-only audit log entity ({@code @Immutable} with {@code updatable = false} columns).
+ * Note: Database-level {@code REVOKE UPDATE, DELETE} privileges are required for tamper-proof enforcement in production.
+ */
 @Entity
+@Immutable
 @Table(name = "audit_logs")
 public class AuditLog {
 

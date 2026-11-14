@@ -33,6 +33,7 @@ public class KafkaEventService {
 
     private final Deque<KafkaEventEnvelopeDto> recentEvents = new ConcurrentLinkedDeque<>();
     private final AtomicLong publishedCount = new AtomicLong(0);
+    private final AtomicLong failedCount = new AtomicLong(0);
     private final AtomicLong consumedCount = new AtomicLong(0);
 
     public KafkaEventService(
@@ -78,23 +79,26 @@ public class KafkaEventService {
                 now
         );
         recordEvent(envelope);
-        publishedCount.incrementAndGet();
 
         if (kafkaEnabled && kafkaTemplate != null) {
             try {
                 kafkaTemplate.send(topic, messageKey != null ? messageKey : eventId, serializedPayload)
                         .whenComplete((result, ex) -> {
                             if (ex != null) {
-                                log.debug("Kafka broker send fallback for topic {} ({}): {}", topic, eventType, ex.getMessage());
+                                failedCount.incrementAndGet();
+                                log.warn("Kafka broker send failed for topic {} ({}): {}", topic, eventType, ex.getMessage());
                             } else {
+                                publishedCount.incrementAndGet();
                                 log.info("Published Kafka event [{}] to topic {} partition {}",
                                         eventType, topic, result.getRecordMetadata().partition());
                             }
                         });
             } catch (Exception ex) {
-                log.debug("Kafka broker unavailable during publish to {} ({}): {}", topic, eventType, ex.getMessage());
+                failedCount.incrementAndGet();
+                log.warn("Kafka broker unavailable during publish to {} ({}): {}", topic, eventType, ex.getMessage());
             }
         } else {
+            publishedCount.incrementAndGet();
             consumedCount.incrementAndGet();
         }
     }
@@ -124,7 +128,9 @@ public class KafkaEventService {
                         KafkaTopicConfig.TOPIC_NOTIFICATION_ALERTS
                 ),
                 publishedCount.get(),
+                failedCount.get(),
                 consumedCount.get(),
+                "BEST_EFFORT_AT_MOST_ONCE",
                 new ArrayList<>(recentEvents)
         );
     }

@@ -193,3 +193,8 @@ Enforced centrally in `DisputeTransitionPolicy` and `DisputeService`:
 
 - **Signature & limit enforcement:** `AttachmentStorageService` validates magic-byte file signatures (`%PDF-`, 8-byte PNG, JPEG `FF D8 FF`), verifies signature/extension/`Content-Type` consistency, enforces a 5 MB per-file limit and max 5 attachments per dispute, blocks uploads to terminal disputes (`409 Conflict`), and registers a `TransactionSynchronization` hook to remove written files if the database transaction rolls back. Downloads include `X-Content-Type-Options: nosniff`.
 - **Malware scanning trade-off:** Full antivirus/sandbox scanning (e.g., ClamAV / ICAP or cloud object-storage quarantine scanning) is omitted in this local/containerized setup to keep dependencies lightweight; in production, `AttachmentStorageService.readAndValidateFile` provides the integration point to stream bytes to an AV scanner before persistence.
+
+## Event Delivery & Audit Log Scope
+
+- **Kafka delivery guarantee (`BEST_EFFORT_AT_MOST_ONCE`):** `KafkaEventService` increments `totalEventsPublished` only upon broker acknowledgement (`CompletableFuture` success) and increments `totalEventsFailed` on broker errors or exceptions. When `APP_KAFKA_ENABLED=false`, events are dispatched via the local `IN_MEMORY_BUS`. Guaranteed delivery in production would require a transactional outbox table.
+- **Audit log integrity & CSV export:** `AuditLog` is application-level append-only (`@Immutable` + `updatable = false` columns; production tamper-proofing requires DB-level `REVOKE UPDATE, DELETE` privileges). CSV exports (`GET /api/v1/admin/audit-logs/export`) neutralize spreadsheet formula injection (`=`, `+`, `-`, `@`, `\t`, `\r`) before RFC-4180 quoting.

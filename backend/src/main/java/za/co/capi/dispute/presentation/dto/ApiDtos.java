@@ -332,8 +332,10 @@ public final class ApiDtos {
             @Schema(description = "True when Redis distributed idempotency lock store is active") boolean redisCacheConnected,
             @Schema(description = "Configured TTL window in seconds for Redis dispute idempotency locks", example = "300") long idempotencyLockTtlSeconds,
             @Schema(description = "Configured Apache Kafka topics") List<String> configuredTopics,
-            @Schema(description = "Total events published since startup") long totalEventsPublished,
+            @Schema(description = "Total events acknowledged by Kafka broker (or in-memory bus when Kafka is disabled)") long totalEventsPublished,
+            @Schema(description = "Total events that failed Kafka broker delivery") long totalEventsFailed,
             @Schema(description = "Total events consumed by @KafkaListener consumer group") long totalEventsConsumed,
+            @Schema(description = "Documented event delivery guarantee") String deliveryGuarantee,
             @Schema(description = "Most recent events published across all topics") List<KafkaEventEnvelopeDto> recentEvents
     ) {}
 
