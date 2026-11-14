@@ -2,7 +2,10 @@ package za.co.capi.dispute.application.service;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import za.co.capi.dispute.domain.model.AppUser;
 import za.co.capi.dispute.domain.model.FraudAlertToken;
 import za.co.capi.dispute.domain.model.PasswordResetOtp;
@@ -10,6 +13,7 @@ import za.co.capi.dispute.domain.model.UserRole;
 import za.co.capi.dispute.domain.repository.AppUserRepository;
 import za.co.capi.dispute.domain.repository.FraudAlertTokenRepository;
 import za.co.capi.dispute.domain.repository.PasswordResetOtpRepository;
+import za.co.capi.dispute.infrastructure.cache.OtpRateLimiterService;
 import za.co.capi.dispute.infrastructure.security.AppUserPrincipal;
 import za.co.capi.dispute.infrastructure.security.JwtTokenProvider;
 import za.co.capi.dispute.presentation.dto.ApiDtos.*;
@@ -25,6 +29,7 @@ import java.util.UUID;
 @Service
 public class AuthService {
 
+    public static final int MAX_OTP_FAILED_ATTEMPTS = 5;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final AppUserRepository appUserRepository;
@@ -35,6 +40,8 @@ public class AuthService {
     private final NotificationEmailService notificationEmailService;
     private final AuditService auditService;
     private final PiiMaskingService piiMaskingService;
+    private final OtpRateLimiterService otpRateLimiterService;
+    private final TransactionTemplate requiresNewTx;
 
     public AuthService(
             AppUserRepository appUserRepository,
@@ -44,7 +51,9 @@ public class AuthService {
             JwtTokenProvider jwtTokenProvider,
             NotificationEmailService notificationEmailService,
             AuditService auditService,
-            PiiMaskingService piiMaskingService) {
+            PiiMaskingService piiMaskingService,
+            OtpRateLimiterService otpRateLimiterService,
+            PlatformTransactionManager transactionManager) {
         this.appUserRepository = appUserRepository;
         this.fraudAlertTokenRepository = fraudAlertTokenRepository;
         this.passwordResetOtpRepository = passwordResetOtpRepository;
@@ -53,6 +62,9 @@ public class AuthService {
         this.notificationEmailService = notificationEmailService;
         this.auditService = auditService;
         this.piiMaskingService = piiMaskingService;
+        this.otpRateLimiterService = otpRateLimiterService;
+        this.requiresNewTx = new TransactionTemplate(transactionManager);
+        this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Transactional
@@ -178,11 +190,14 @@ public class AuthService {
             user.incrementTokenVersion(); // Terminates all active JWT sessions immediately
             appUserRepository.save(user);
 
+            passwordResetOtpRepository.invalidateActiveOtpsForUser(user.getId());
+
             String otpCode = String.format("%06d", 100000 + SECURE_RANDOM.nextInt(900000));
             PasswordResetOtp otp = new PasswordResetOtp();
             otp.setUserId(user.getId());
             otp.setEmail(user.getEmail());
-            otp.setOtpCode(otpCode);
+            otp.setOtpHash(passwordEncoder.encode(otpCode));
+            otp.setFailedAttempts(0);
             otp.setUsed(false);
             otp.setExpiresAt(Instant.now().plus(30, ChronoUnit.MINUTES));
             passwordResetOtpRepository.save(otp);
@@ -215,19 +230,60 @@ public class AuthService {
     @Transactional
     public UserProfileDto verifyOtpAndResetPassword(ResetPasswordVerifyRequest request, String ipAddress) {
         String normalizedEmail = request.email().trim();
+        if (!otpRateLimiterService.tryConsumeAttempt(normalizedEmail, ipAddress)) {
+            auditService.logEvent(
+                    null,
+                    normalizedEmail,
+                    "WARN",
+                    "OTP_VERIFICATION_RATE_LIMITED",
+                    "PasswordResetOtp",
+                    normalizedEmail,
+                    ipAddress,
+                    Map.of("email", normalizedEmail)
+            );
+            throw ApiException.tooManyRequests("Too many OTP verification attempts. Please wait before trying again.");
+        }
+
         PasswordResetOtp otp = passwordResetOtpRepository
-                .findTopByEmailIgnoreCaseAndOtpCodeAndUsedFalseOrderByCreatedAtDesc(normalizedEmail, request.otpCode().trim())
+                .findTopByEmailIgnoreCaseAndUsedFalseOrderByCreatedAtDesc(normalizedEmail)
                 .orElseThrow(() -> ApiException.badRequest("Invalid or already used 6-digit verification code."));
 
         if (otp.getExpiresAt().isBefore(Instant.now())) {
             throw ApiException.badRequest("Verification code has expired.");
         }
 
+        if (otp.getFailedAttempts() >= MAX_OTP_FAILED_ATTEMPTS) {
+            throw ApiException.tooManyRequests("Maximum OTP verification attempts exceeded. Please request a new code.");
+        }
+
+        if (!passwordEncoder.matches(request.otpCode().trim(), otp.getOtpHash())) {
+            requiresNewTx.executeWithoutResult(status ->
+                    passwordResetOtpRepository.incrementFailedAttempts(otp.getId(), MAX_OTP_FAILED_ATTEMPTS));
+            int updatedAttempts = otp.getFailedAttempts() + 1;
+            auditService.logEvent(
+                    otp.getUserId(),
+                    normalizedEmail,
+                    "WARN",
+                    "OTP_VERIFICATION_FAILED",
+                    "PasswordResetOtp",
+                    otp.getId().toString(),
+                    ipAddress,
+                    Map.of("failedAttempts", updatedAttempts)
+            );
+            if (updatedAttempts >= MAX_OTP_FAILED_ATTEMPTS) {
+                throw ApiException.tooManyRequests("Maximum OTP verification attempts exceeded. Please request a new code.");
+            }
+            throw ApiException.badRequest("Invalid or already used 6-digit verification code.");
+        }
+
+        int consumed = passwordResetOtpRepository.consumeOtpAtomically(
+                otp.getId(), Instant.now(), MAX_OTP_FAILED_ATTEMPTS);
+        if (consumed == 0) {
+            throw ApiException.conflict("Verification code has already been used or expired.");
+        }
+
         AppUser user = appUserRepository.findById(otp.getUserId())
                 .orElseThrow(() -> ApiException.notFound("User not found."));
-
-        otp.setUsed(true);
-        passwordResetOtpRepository.save(otp);
 
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         user.setLocked(false);

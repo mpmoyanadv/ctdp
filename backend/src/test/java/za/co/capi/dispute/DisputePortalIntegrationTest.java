@@ -6,6 +6,7 @@ import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,8 +26,12 @@ import za.co.capi.dispute.domain.repository.PasswordResetOtpRepository;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -134,13 +139,18 @@ class DisputePortalIntegrationTest {
                         .content("{\"email\":\"customer@capi.test\",\"password\":\"Password123!\"}"))
                 .andExpect(status().isLocked());
 
-        // Unlock with OTP
+        // Unlock with OTP extracted from emailed notification (DB stores only hash)
         PasswordResetOtp otp = passwordResetOtpRepository.findAll().getFirst();
+        assertThat(otp.getOtpHash()).startsWith("$2");
+        ArgumentCaptor<MimeMessage> mailCaptor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(javaMailSender, atLeastOnce()).send(mailCaptor.capture());
+        String otpCode = extractOtpFromSubjects(mailCaptor.getAllValues());
+
         mockMvc.perform(post("/api/v1/auth/reset-password-verify")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email":"customer@capi.test","otpCode":"%s","newPassword":"Password123!"}
-                                """.formatted(otp.getOtpCode())))
+                                """.formatted(otpCode)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isLocked").value(false));
 
@@ -307,6 +317,20 @@ class DisputePortalIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
         return objectMapper.readTree(res.getResponse().getContentAsString()).get("accessToken").asText();
+    }
+
+    private String extractOtpFromSubjects(List<MimeMessage> messages) throws Exception {
+        Pattern pattern = Pattern.compile("\\((\\d{6})\\)");
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            String subject = messages.get(i).getSubject();
+            if (subject != null) {
+                Matcher matcher = pattern.matcher(subject);
+                if (matcher.find()) {
+                    return matcher.group(1);
+                }
+            }
+        }
+        throw new IllegalStateException("No 6-digit OTP found in dispatched emails");
     }
 }
 

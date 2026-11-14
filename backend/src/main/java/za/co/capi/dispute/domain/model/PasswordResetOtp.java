@@ -18,8 +18,11 @@ public class PasswordResetOtp {
     @Column(nullable = false, length = 160)
     private String email;
 
-    @Column(name = "otp_code", nullable = false, length = 10)
-    private String otpCode;
+    @Column(name = "otp_hash", nullable = false, length = 120)
+    private String otpHash;
+
+    @Column(name = "failed_attempts", nullable = false)
+    private int failedAttempts = 0;
 
     @Column(nullable = false)
     private boolean used = false;
@@ -57,12 +60,20 @@ public class PasswordResetOtp {
         this.email = email;
     }
 
-    public String getOtpCode() {
-        return otpCode;
+    public String getOtpHash() {
+        return otpHash;
     }
 
-    public void setOtpCode(String otpCode) {
-        this.otpCode = otpCode;
+    public void setOtpHash(String otpHash) {
+        this.otpHash = otpHash;
+    }
+
+    public int getFailedAttempts() {
+        return failedAttempts;
+    }
+
+    public void setFailedAttempts(int failedAttempts) {
+        this.failedAttempts = failedAttempts;
     }
 
     public boolean isUsed() {
