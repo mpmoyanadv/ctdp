@@ -72,7 +72,7 @@ class DisputePortalIntegrationTest {
         MockMultipartFile pdfFile = new MockMultipartFile(
                 "files", "statement.pdf", "application/pdf", "%PDF-1.4 sample evidence".getBytes(StandardCharsets.UTF_8));
         MockMultipartFile pngFile = new MockMultipartFile(
-                "files", "receipt.png", "image/png", new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A});
+                "files", "receipt.png", "image/png", new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A});
 
         MvcResult createResult = mockMvc.perform(multipart("/api/v1/disputes")
                         .file(pdfFile)

@@ -188,3 +188,8 @@ Enforced centrally in `DisputeTransitionPolicy` and `DisputeService`:
   - Prevents duplicate active disputes on the same `transactionId` (`409 Conflict` while a non-terminal dispute exists; `REJECTED` cases can still be re-opened).
   - Derives `merchantName`, `paymentRail`, and `amount` authoritatively from `BankTransaction`, ignoring any tampered client-supplied values.
 - **Free-form / unlinked disputes (`transactionId` omitted):** Supported for omnichannel or unlinked intakes where a ledger transaction ID is not yet matched; uses client/channel-supplied merchant, rail, and amount with safe defaults.
+
+## Attachment Security & Malware-Scanning Trade-Off
+
+- **Signature & limit enforcement:** `AttachmentStorageService` validates magic-byte file signatures (`%PDF-`, 8-byte PNG, JPEG `FF D8 FF`), verifies signature/extension/`Content-Type` consistency, enforces a 5 MB per-file limit and max 5 attachments per dispute, blocks uploads to terminal disputes (`409 Conflict`), and registers a `TransactionSynchronization` hook to remove written files if the database transaction rolls back. Downloads include `X-Content-Type-Options: nosniff`.
+- **Malware scanning trade-off:** Full antivirus/sandbox scanning (e.g., ClamAV / ICAP or cloud object-storage quarantine scanning) is omitted in this local/containerized setup to keep dependencies lightweight; in production, `AttachmentStorageService.readAndValidateFile` provides the integration point to stream bytes to an AV scanner before persistence.

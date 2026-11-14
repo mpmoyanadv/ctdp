@@ -174,6 +174,7 @@ public class DisputeController {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(attachment.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + attachment.getFileName() + "\"")
+                .header("X-Content-Type-Options", "nosniff")
                 .body(resource);
     }
 
