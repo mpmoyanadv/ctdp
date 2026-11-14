@@ -10,7 +10,9 @@ Customers can view settled account transactions across payment rails (`CARD_POS`
 
 ```text
 transactions_dispute_portal/
+├── .github/workflows/ci.yml  # GitHub Actions CI (backend tests, Angular tests & build, Compose check)
 ├── docker-compose.yml        # PostgreSQL, Redis, Kafka (KRaft), MailHog, Backend, Frontend
+├── scripts/smoke.sh          # End-to-end API & UI smoke verification script
 ├── backend/
 │   ├── Dockerfile            # Multi-stage Maven build + JUnit tests -> JRE 21 Alpine
 │   ├── pom.xml
@@ -18,16 +20,16 @@ transactions_dispute_portal/
 │       ├── main/java/za/co/capi/dispute/
 │       │   ├── domain/           # JPA entities & repositories
 │       │   ├── application/      # Core business services (Auth, Dispute, Audit, Storage, PII Masking, Productivity)
-│       │   ├── infrastructure/   # Security (JWT), Redis idempotency lock, Kafka producer/consumer, OpenAPI, DataSeeder
+│       │   ├── infrastructure/   # Security (JWT, rate limiting, proxy trust), Redis idempotency lock, Kafka, OpenAPI, DataSeeder
 │       │   └── presentation/     # REST controllers, DTOs, global exception handler
-│       └── test/java/za/co/capi/dispute/
-│           ├── DisputePortalIntegrationTest.java
-│           └── PiiMaskingServiceTest.java
+│       ├── main/resources/db/migration/ # Flyway migrations (common + postgresql)
+│       └── test/java/za/co/capi/dispute/ # 15 JUnit 5 integration & unit test classes
 └── frontend/
-    ├── Dockerfile            # Multi-stage Node 22 build -> Nginx 1.27 Alpine
+    ├── Dockerfile            # Multi-stage Node 22 (`npm ci`) build -> Nginx 1.27 Alpine
     ├── nginx.conf            # SPA routing + reverse proxy to backend:8080
+    ├── package-lock.json     # Locked frontend dependencies
     └── src/app/
-        ├── core/             # Auth service, API client, JWT interceptor, route guards
+        ├── core/             # Auth service, API client, JWT interceptor, route guards + *.spec.ts unit tests
         └── features/         # Login, Fraud Report, OTP Reset, Customer, Staff, Affiliate, Admin, Dispute Detail
 ```
 
@@ -110,7 +112,7 @@ docker compose down -v
 3. Start frontend:
    ```bash
    cd frontend
-   npm install
+   npm ci --legacy-peer-deps
    npm start
    ```
 
@@ -128,12 +130,33 @@ mvn clean test
 ```
 
 Coverage includes:
-- Full dispute lifecycle with multipart evidence uploads and SHA-256 verification
-- Redis idempotency lock rejection (`409 Conflict`) on duplicate submission
-- Cross-customer IDOR rejection (`403 Forbidden`) and `UNAUTHORIZED_ACCESS_ATTEMPT` audit logging
-- Fraud alert lockdown (`423 Locked`), JWT session revocation, and 6-digit OTP password reset
+- Full dispute lifecycle with multipart evidence uploads, magic-byte validation, and SHA-256 verification (`DisputePortalIntegrationTest`, `AttachmentSecurityTest`)
+- Redis idempotency lock rejection (`409 Conflict`) on duplicate submission and transaction ownership/settlement checks (`TransactionIntegrityTest`)
+- Cross-customer IDOR rejection (`403 Forbidden`), role/transition enforcement (`DisputeAuthorizationAndTransitionTest`), and `UNAUTHORIZED_ACCESS_ATTEMPT` audit logging
+- Fraud alert two-step confirmation lockdown (`423 Locked`), JWT session revocation, and cryptographic 6-digit OTP password reset (`FraudRecoveryConfirmationTest`, `OtpSecurityTest`)
 - External affiliate PII masking (`PiiMaskingServiceTest`)
-- Linked re-opening of rejected disputes, CSV audit export, productivity reporting, Kafka stream telemetry, and OpenAPI endpoint checks
+- Fail-fast JWT secret validation, profile-gated demo seeding, and CORS/proxy trust (`JwtSecretValidationTest`, `DataSeederWithDemoProfileTest`, `DataSeederWithoutDemoProfileTest`, `CorsAndProxyTrustTest`)
+- Flyway schema migrations, pagination boundaries, stable sorting, CSV formula-injection sanitization, and Kafka telemetry (`FlywayMigrationAndConstraintTest`, `PaginationAndQueryOptimizationTest`, `AuditCsvSanitizationTest`, `KafkaEventServiceTest`)
+
+### Automated Frontend Tests (Angular Karma + Jasmine)
+
+```bash
+cd frontend
+npm ci --legacy-peer-deps
+NG_CLI_ANALYTICS=false npm test
+```
+
+Covers `AuthService`, `PortalApiService` (`PageResponse<T>` unwrapping), `authGuard`/`roleGuard`, and `authInterceptor` in headless Chrome.
+
+### End-to-End Smoke Verification & CI
+
+After bringing up the Docker Compose stack (`docker compose up -d --build`), run:
+
+```bash
+./scripts/smoke.sh
+```
+
+GitHub Actions CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the backend Maven tests, frontend Karma unit tests + production build, and `docker compose config -q` on pushes and pull requests to `main`.
 
 ---
 
@@ -145,7 +168,7 @@ Coverage includes:
 | `POST /api/v1/auth/report-fraud?token=...` | Public | Lock account, revoke active JWTs, log audit, email 6-digit OTP |
 | `POST /api/v1/auth/reset-password-verify` | Public | Verify 6-digit OTP, update password, unlock account |
 | `GET /api/v1/transactions` | `CUSTOMER` | List authenticated customer's transactions |
-| `GET /api/v1/disputes` | Authenticated | List disputes scoped by role/domain |
+| `GET /api/v1/disputes` | Authenticated | List paginated disputes (`page`, `size`, optional `status`) scoped by role/domain |
 | `POST /api/v1/disputes` | `CUSTOMER` | Create dispute (JSON or `multipart/form-data`, Redis idempotency locked) |
 | `GET /api/v1/disputes/{id}` | Authenticated | Get dispute details, notes, attachments, and lineage |
 | `POST /api/v1/disputes/{id}/attachments` | `CUSTOMER`, `STAFF`, `ADMIN` | Upload additional evidence files (blocked in terminal states) |
@@ -155,8 +178,8 @@ Coverage includes:
 | `POST /api/v1/disputes/{id}/delegate` | `STAFF`, `ADMIN` | Delegate dispute to `PARTNER_BANKSERV` or `PARTNER_MERCHANT` |
 | `PATCH /api/v1/disputes/{id}/status` | `STAFF`, `ADMIN` | Transition dispute status |
 | `POST /api/v1/disputes/{id}/reopen` | `CUSTOMER` | Re-open a `REJECTED` dispute as a linked case |
-| `GET /api/v1/admin/audit-logs` | `ADMIN` | View audit logs |
-| `GET /api/v1/admin/audit-logs/export` | `ADMIN` | Export audit logs as CSV |
+| `GET /api/v1/admin/audit-logs` | `ADMIN` | View paginated audit logs (`page`, `size`, optional `eventType`) |
+| `GET /api/v1/admin/audit-logs/export` | `ADMIN` | Export audit logs as CSV (bounded to 10,000 most recent rows) |
 | `GET /api/v1/admin/reports/productivity` | `ADMIN` | View investigator turnaround metrics |
 | `GET /api/v1/admin/events/kafka-stream` | `ADMIN` | Inspect Kafka topics/events and Redis lock status |
 | `POST /api/v1/admin/users/{id}/unlock` | `ADMIN` | Unlock a locked user account |
@@ -197,4 +220,10 @@ Enforced centrally in `DisputeTransitionPolicy` and `DisputeService`:
 ## Event Delivery & Audit Log Scope
 
 - **Kafka delivery guarantee (`BEST_EFFORT_AT_MOST_ONCE`):** `KafkaEventService` increments `totalEventsPublished` only upon broker acknowledgement (`CompletableFuture` success) and increments `totalEventsFailed` on broker errors or exceptions. When `APP_KAFKA_ENABLED=false`, events are dispatched via the local `IN_MEMORY_BUS`. Guaranteed delivery in production would require a transactional outbox table.
-- **Audit log integrity & CSV export:** `AuditLog` is application-level append-only (`@Immutable` + `updatable = false` columns; production tamper-proofing requires DB-level `REVOKE UPDATE, DELETE` privileges). CSV exports (`GET /api/v1/admin/audit-logs/export`) neutralize spreadsheet formula injection (`=`, `+`, `-`, `@`, `\t`, `\r`) before RFC-4180 quoting.
+- **Audit log integrity & CSV export:** `AuditLog` is application-level append-only (`@Immutable` + `updatable = false` columns; production tamper-proofing requires DB-level `REVOKE UPDATE, DELETE` privileges). CSV exports (`GET /api/v1/admin/audit-logs/export`) neutralize spreadsheet formula injection (`=`, `+`, `-`, `@`, `\t`, `\r`) before RFC-4180 quoting and are capped at 10,000 rows (`timestamp DESC, id DESC`).
+
+## Security, Migrations & Production Configuration
+
+- **Schema migrations:** Flyway manages schema evolution (`src/main/resources/db/migration/common` and `postgresql`) with Hibernate `ddl-auto=validate`.
+- **Fail-fast production secrets & profile gating:** `DataSeeder` only runs under `demo` or `dev` profiles. Non-demo deployments require an explicit `APP_JWT_SECRET` (minimum 32 bytes) and fail fast on startup if missing or using the placeholder/default secret.
+- **Rate limiting & trusted proxies:** `AuthRateLimitFilter` enforces per-IP/account limits on `/api/v1/auth/login`, `/api/v1/auth/report-fraud`, and `/api/v1/auth/reset-password-verify`. Forwarded client IP headers are honored only from CIDRs configured in `APP_TRUSTED_PROXIES`.
