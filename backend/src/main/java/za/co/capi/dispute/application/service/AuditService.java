@@ -9,8 +9,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import za.co.capi.dispute.domain.model.AuditLog;
 import za.co.capi.dispute.domain.repository.AuditLogRepository;
 import za.co.capi.dispute.infrastructure.messaging.KafkaEventService;
@@ -21,37 +24,80 @@ import za.co.capi.dispute.presentation.dto.ApiDtos.PageResponseDto;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class AuditService {
 
+    private static final int MAX_CSV_EXPORT_ROWS = 10_000;
+    private static final Set<String> REQUIRES_NEW_SECURITY_EVENTS = Set.of(
+            "UNAUTHORIZED_ACCESS_ATTEMPT",
+            "LOGIN_BLOCKED_LOCKED",
+            "LOGIN_FAILED_BAD_CREDENTIALS",
+            "LOGIN_FAILED_UNKNOWN_USER",
+            "LOGIN_RATE_LIMITED_IP",
+            "OTP_VERIFICATION_FAILED",
+            "OTP_VERIFICATION_RATE_LIMITED",
+            "IDEMPOTENCY_DUPLICATE_PREVENTED"
+    );
+
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
     private final KafkaEventService kafkaEventService;
     private final ClientIpResolver clientIpResolver;
+    private final TransactionTemplate requiresNewTx;
 
     @Autowired
     public AuditService(
             AuditLogRepository auditLogRepository,
             ObjectMapper objectMapper,
             KafkaEventService kafkaEventService,
-            ClientIpResolver clientIpResolver) {
+            ClientIpResolver clientIpResolver,
+            @Autowired(required = false) PlatformTransactionManager transactionManager) {
         this.auditLogRepository = auditLogRepository;
         this.objectMapper = objectMapper;
         this.kafkaEventService = kafkaEventService;
         this.clientIpResolver = clientIpResolver;
+        if (transactionManager != null) {
+            TransactionTemplate tpl = new TransactionTemplate(transactionManager);
+            tpl.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            this.requiresNewTx = tpl;
+        } else {
+            this.requiresNewTx = null;
+        }
     }
 
     public AuditService(
             AuditLogRepository auditLogRepository,
             ObjectMapper objectMapper,
             KafkaEventService kafkaEventService) {
-        this(auditLogRepository, objectMapper, kafkaEventService, new ClientIpResolver(List.of()));
+        this(auditLogRepository, objectMapper, kafkaEventService, new ClientIpResolver(List.of()), null);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRED)
     public AuditLog logEvent(
+            UUID actorId,
+            String actorEmail,
+            String severity,
+            String eventType,
+            String entityName,
+            String entityId,
+            String ipAddress,
+            Map<String, Object> metadataMap) {
+
+        boolean isolateInNewTx = requiresNewTx != null
+                && eventType != null
+                && REQUIRES_NEW_SECURITY_EVENTS.contains(eventType);
+
+        if (isolateInNewTx) {
+            return requiresNewTx.execute(status ->
+                    persistAndPublishAudit(actorId, actorEmail, severity, eventType, entityName, entityId, ipAddress, metadataMap));
+        }
+        return persistAndPublishAudit(actorId, actorEmail, severity, eventType, entityName, entityId, ipAddress, metadataMap);
+    }
+
+    private AuditLog persistAndPublishAudit(
             UUID actorId,
             String actorEmail,
             String severity,
@@ -87,8 +133,6 @@ public class AuditService {
         );
         return saved;
     }
-
-    private static final int MAX_CSV_EXPORT_ROWS = 10_000;
 
     @Transactional(readOnly = true)
     public PageResponseDto<AuditLogDto> getLogsPage(String eventTypeFilter, int page, int size) {
@@ -165,18 +209,16 @@ public class AuditService {
         if (value == null) {
             return "";
         }
-        String safeValue = value;
-        if (!safeValue.isEmpty()) {
-            char first = safeValue.charAt(0);
+        String neutralized = value;
+        if (!neutralized.isEmpty()) {
+            char first = neutralized.charAt(0);
             if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r') {
-                safeValue = "'" + safeValue;
+                neutralized = "'" + neutralized;
             }
         }
-        String escaped = safeValue.replace("\"", "\"\"");
-        if (escaped.contains(",") || escaped.contains("\"") || escaped.contains("\n") || escaped.contains("\r")) {
-            return "\"" + escaped + "\"";
+        if (neutralized.contains(",") || neutralized.contains("\"") || neutralized.contains("\n") || neutralized.contains("\r")) {
+            return "\"" + neutralized.replace("\"", "\"\"") + "\"";
         }
-        return escaped;
+        return neutralized;
     }
 }
-

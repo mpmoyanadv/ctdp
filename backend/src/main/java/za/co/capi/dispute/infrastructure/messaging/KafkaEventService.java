@@ -6,9 +6,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import za.co.capi.dispute.presentation.dto.ApiDtos.KafkaEventEnvelopeDto;
 import za.co.capi.dispute.presentation.dto.ApiDtos.KafkaStreamStatusDto;
 
@@ -30,31 +33,55 @@ public class KafkaEventService {
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
     private final boolean kafkaEnabled;
+    private final ApplicationEventPublisher eventPublisher;
 
     private final Deque<KafkaEventEnvelopeDto> recentEvents = new ConcurrentLinkedDeque<>();
     private final AtomicLong publishedCount = new AtomicLong(0);
     private final AtomicLong failedCount = new AtomicLong(0);
     private final AtomicLong consumedCount = new AtomicLong(0);
 
+    @Autowired
     public KafkaEventService(
             @Autowired(required = false) KafkaTemplate<String, String> kafkaTemplate,
             ObjectMapper objectMapper,
-            @Value("${app.kafka.enabled:true}") boolean kafkaEnabled) {
+            @Value("${app.kafka.enabled:true}") boolean kafkaEnabled,
+            @Autowired(required = false) ApplicationEventPublisher eventPublisher) {
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
         this.kafkaEnabled = kafkaEnabled;
+        this.eventPublisher = eventPublisher;
+    }
+
+    public KafkaEventService(
+            KafkaTemplate<String, String> kafkaTemplate,
+            ObjectMapper objectMapper,
+            boolean kafkaEnabled) {
+        this(kafkaTemplate, objectMapper, kafkaEnabled, null);
     }
 
     public void publishDisputeLifecycleEvent(String eventType, String disputeKey, Map<String, Object> payload) {
-        publishEvent(KafkaTopicConfig.TOPIC_DISPUTE_LIFECYCLE, eventType, disputeKey, payload);
+        enqueueOrPublish(KafkaTopicConfig.TOPIC_DISPUTE_LIFECYCLE, eventType, disputeKey, payload);
     }
 
     public void publishSecurityAuditEvent(String eventType, String entityKey, Map<String, Object> payload) {
-        publishEvent(KafkaTopicConfig.TOPIC_SECURITY_AUDIT, eventType, entityKey, payload);
+        enqueueOrPublish(KafkaTopicConfig.TOPIC_SECURITY_AUDIT, eventType, entityKey, payload);
     }
 
     public void publishAlertNotificationEvent(String alertType, String recipientKey, Map<String, Object> payload) {
-        publishEvent(KafkaTopicConfig.TOPIC_NOTIFICATION_ALERTS, alertType, recipientKey, payload);
+        enqueueOrPublish(KafkaTopicConfig.TOPIC_NOTIFICATION_ALERTS, alertType, recipientKey, payload);
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void handleAfterCommitKafkaEvent(PendingKafkaEvent event) {
+        publishEvent(event.topic(), event.eventType(), event.messageKey(), event.payload());
+    }
+
+    private void enqueueOrPublish(String topic, String eventType, String messageKey, Map<String, Object> payload) {
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new PendingKafkaEvent(topic, eventType, messageKey, payload));
+        } else {
+            publishEvent(topic, eventType, messageKey, payload);
+        }
     }
 
     private void publishEvent(String topic, String eventType, String messageKey, Map<String, Object> payload) {
@@ -149,5 +176,11 @@ public class KafkaEventService {
             return "{}";
         }
     }
-}
 
+    public record PendingKafkaEvent(
+            String topic,
+            String eventType,
+            String messageKey,
+            Map<String, Object> payload
+    ) {}
+}

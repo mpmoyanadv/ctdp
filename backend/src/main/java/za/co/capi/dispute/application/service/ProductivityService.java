@@ -1,5 +1,6 @@
 package za.co.capi.dispute.application.service;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.capi.dispute.domain.model.AppUser;
@@ -9,6 +10,7 @@ import za.co.capi.dispute.domain.model.UserRole;
 import za.co.capi.dispute.domain.repository.AppUserRepository;
 import za.co.capi.dispute.domain.repository.DisputeRepository;
 import za.co.capi.dispute.domain.repository.StaffWorkSessionRepository;
+import za.co.capi.dispute.domain.repository.StaffWorkSessionRepository.StaffProductivityAggregateProjection;
 import za.co.capi.dispute.presentation.dto.ApiDtos.ProductivityReportDto;
 import za.co.capi.dispute.presentation.dto.ApiDtos.StaffProductivityRowDto;
 import za.co.capi.dispute.presentation.dto.ApiDtos.WorkSessionDetailDto;
@@ -59,41 +61,45 @@ public class ProductivityService {
     @Transactional(readOnly = true)
     public ProductivityReportDto buildProductivityReport() {
         List<AppUser> internalUsers = userRepository.findByRoleInOrderByEmailAsc(List.of(UserRole.STAFF, UserRole.ADMIN));
-        List<StaffWorkSession> allSessions = sessionRepository.findAllByOrderByStartedAtDesc();
+        Map<UUID, StaffProductivityAggregateProjection> statsByStaff = sessionRepository.aggregateByStaff().stream()
+                .collect(Collectors.toMap(StaffProductivityAggregateProjection::getStaffId, agg -> agg));
 
-        Map<UUID, AppUser> userById = userRepository.findAll().stream()
-                .collect(Collectors.toMap(AppUser::getId, u -> u));
-        Map<UUID, String> disputeRefById = disputeRepository.findAll().stream()
-                .collect(Collectors.toMap(Dispute::getId, Dispute::getDisputeReference));
+        List<StaffWorkSession> recentSessions = sessionRepository
+                .findAllByOrderByStartedAtDesc(PageRequest.of(0, 50))
+                .getContent();
 
-        Map<UUID, List<StaffWorkSession>> sessionsByStaff = allSessions.stream()
-                .collect(Collectors.groupingBy(StaffWorkSession::getStaffId));
+        Set<UUID> recentStaffIds = new HashSet<>();
+        Set<UUID> recentDisputeIds = new HashSet<>();
+        for (StaffWorkSession session : recentSessions) {
+            recentStaffIds.add(session.getStaffId());
+            recentDisputeIds.add(session.getDisputeId());
+        }
+
+        Map<UUID, AppUser> userById = recentStaffIds.isEmpty()
+                ? Map.of()
+                : userRepository.findAllById(recentStaffIds).stream()
+                        .collect(Collectors.toMap(AppUser::getId, u -> u));
+        Map<UUID, String> disputeRefById = recentDisputeIds.isEmpty()
+                ? Map.of()
+                : disputeRepository.findAllById(recentDisputeIds).stream()
+                        .collect(Collectors.toMap(Dispute::getId, Dispute::getDisputeReference));
 
         List<StaffProductivityRowDto> rows = new ArrayList<>();
         for (AppUser staff : internalUsers) {
-            List<StaffWorkSession> staffSessions = sessionsByStaff.getOrDefault(staff.getId(), List.of());
-            List<StaffWorkSession> completed = staffSessions.stream()
-                    .filter(s -> s.getCompletedAt() != null && s.getTotalDurationSeconds() != null)
-                    .toList();
-            long activeCount = staffSessions.stream()
-                    .filter(s -> s.getCompletedAt() == null)
-                    .count();
-            long totalDuration = completed.stream()
-                    .mapToLong(StaffWorkSession::getTotalDurationSeconds)
-                    .sum();
-            double avgDuration = completed.isEmpty()
+            StaffProductivityAggregateProjection agg = statsByStaff.get(staff.getId());
+            long completedCount = agg != null && agg.getCompletedSessions() != null ? agg.getCompletedSessions() : 0L;
+            long activeCount = agg != null && agg.getActiveSessions() != null ? agg.getActiveSessions() : 0L;
+            long totalDuration = agg != null && agg.getTotalDurationSeconds() != null ? agg.getTotalDurationSeconds() : 0L;
+            long distinctDisputes = agg != null && agg.getDistinctDisputesHandled() != null ? agg.getDistinctDisputesHandled() : 0L;
+            double avgDuration = completedCount == 0L
                     ? 0.0
-                    : Math.round(((double) totalDuration / completed.size()) * 100.0) / 100.0;
-            long distinctDisputes = staffSessions.stream()
-                    .map(StaffWorkSession::getDisputeId)
-                    .distinct()
-                    .count();
+                    : Math.round(((double) totalDuration / completedCount) * 100.0) / 100.0;
 
             rows.add(new StaffProductivityRowDto(
                     staff.getId(),
                     staff.getEmail(),
                     staff.getFullName(),
-                    completed.size(),
+                    completedCount,
                     activeCount,
                     totalDuration,
                     avgDuration,
@@ -101,8 +107,7 @@ public class ProductivityService {
             ));
         }
 
-        List<WorkSessionDetailDto> recentSessionDtos = allSessions.stream()
-                .limit(50)
+        List<WorkSessionDetailDto> recentSessionDtos = recentSessions.stream()
                 .map(s -> {
                     AppUser u = userById.get(s.getStaffId());
                     return new WorkSessionDetailDto(
@@ -121,4 +126,3 @@ public class ProductivityService {
         return new ProductivityReportDto(rows, recentSessionDtos);
     }
 }
-

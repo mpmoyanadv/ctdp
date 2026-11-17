@@ -3,10 +3,14 @@ package za.co.capi.dispute.application.service;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.util.HtmlUtils;
 import za.co.capi.dispute.domain.model.DisputeChannel;
 import za.co.capi.dispute.infrastructure.messaging.KafkaEventService;
@@ -25,20 +29,33 @@ public class NotificationEmailService {
     private final JavaMailSender mailSender;
     private final KafkaEventService kafkaEventService;
     private final PiiMaskingService piiMaskingService;
+    private final ApplicationEventPublisher eventPublisher;
     private final String frontendBaseUrl;
     private final String fromAddress;
 
+    @Autowired
     public NotificationEmailService(
             JavaMailSender mailSender,
             KafkaEventService kafkaEventService,
             PiiMaskingService piiMaskingService,
+            @Autowired(required = false) ApplicationEventPublisher eventPublisher,
             @Value("${app.frontend-base-url:http://localhost:4200}") String frontendBaseUrl,
             @Value("${app.mail.from:security-alerts@capi.test}") String fromAddress) {
         this.mailSender = mailSender;
         this.kafkaEventService = kafkaEventService;
         this.piiMaskingService = piiMaskingService;
+        this.eventPublisher = eventPublisher;
         this.frontendBaseUrl = frontendBaseUrl;
         this.fromAddress = fromAddress;
+    }
+
+    public NotificationEmailService(
+            JavaMailSender mailSender,
+            KafkaEventService kafkaEventService,
+            PiiMaskingService piiMaskingService,
+            String frontendBaseUrl,
+            String fromAddress) {
+        this(mailSender, kafkaEventService, piiMaskingService, null, frontendBaseUrl, fromAddress);
     }
 
     public void sendCustomerLoginAlert(String recipientEmail, String fullName, String fraudToken, String ipAddress) {
@@ -191,7 +208,20 @@ public class NotificationEmailService {
         sendHtmlEmail("OMNICHANNEL_DISPUTE_CONFIRMATION", recipientEmail, subject, html);
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onAfterCommitEmail(PendingEmailDispatchEvent event) {
+        dispatchEmailInternal(event.templateName(), event.to(), event.subject(), event.htmlBody());
+    }
+
     private void sendHtmlEmail(String templateName, String to, String subject, String htmlBody) {
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new PendingEmailDispatchEvent(templateName, to, subject, htmlBody));
+        } else {
+            dispatchEmailInternal(templateName, to, subject, htmlBody);
+        }
+    }
+
+    private void dispatchEmailInternal(String templateName, String to, String subject, String htmlBody) {
         String maskedRecipient = piiMaskingService.maskEmail(to);
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -210,4 +240,11 @@ public class NotificationEmailService {
     private static String escapeHtml(String value) {
         return value == null ? "" : HtmlUtils.htmlEscape(value, StandardCharsets.UTF_8.name());
     }
+
+    public record PendingEmailDispatchEvent(
+            String templateName,
+            String to,
+            String subject,
+            String htmlBody
+    ) {}
 }

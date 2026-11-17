@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import za.co.capi.dispute.domain.model.*;
 import za.co.capi.dispute.domain.repository.*;
+import za.co.capi.dispute.domain.repository.DisputeAttachmentRepository.DisputeAttachmentCountProjection;
 import za.co.capi.dispute.infrastructure.cache.IdempotencyLockService;
 import za.co.capi.dispute.infrastructure.messaging.KafkaEventService;
 import za.co.capi.dispute.infrastructure.security.AppUserPrincipal;
@@ -101,9 +102,11 @@ public class DisputeService {
         };
 
         List<Dispute> pageContent = disputesPage.getContent();
+        Set<UUID> disputeIds = new HashSet<>();
         Set<UUID> userIds = new HashSet<>();
         Set<UUID> originalIds = new HashSet<>();
         for (Dispute d : pageContent) {
+            disputeIds.add(d.getId());
             if (d.getCustomerId() != null) {
                 userIds.add(d.getCustomerId());
             }
@@ -123,8 +126,16 @@ public class DisputeService {
                 ? Map.of()
                 : disputeRepository.findAllById(originalIds).stream()
                         .collect(Collectors.toMap(Dispute::getId, Dispute::getDisputeReference));
+        Map<UUID, Long> attachmentCountById = disputeIds.isEmpty()
+                ? Map.of()
+                : attachmentRepository.countByDisputeIds(disputeIds).stream()
+                        .collect(Collectors.toMap(
+                                DisputeAttachmentCountProjection::getDisputeId,
+                                DisputeAttachmentCountProjection::getAttachmentCount
+                        ));
 
-        Page<DisputeSummaryDto> dtoPage = disputesPage.map(d -> toSummaryDto(d, actor.getRole(), usersById, refById));
+        Page<DisputeSummaryDto> dtoPage = disputesPage.map(
+                d -> toSummaryDto(d, actor.getRole(), usersById, refById, attachmentCountById));
         return PageResponseDto.from(dtoPage);
     }
 
@@ -915,7 +926,8 @@ public class DisputeService {
             Dispute d,
             UserRole viewerRole,
             Map<UUID, AppUser> usersById,
-            Map<UUID, String> refById) {
+            Map<UUID, String> refById,
+            Map<UUID, Long> attachmentCountById) {
 
         AppUser customer = usersById.get(d.getCustomerId());
         AppUser assignee = d.getAssignedUserId() != null ? usersById.get(d.getAssignedUserId()) : null;
@@ -931,17 +943,17 @@ public class DisputeService {
                 d.getStatus().isTerminal(),
                 d.getCategory(),
                 d.getAmount(),
-                d.getReason(),
-                d.getResolutionSummary(),
+                piiMaskingService.maskFreeText(d.getReason(), customer, viewerRole),
+                piiMaskingService.maskFreeText(d.getResolutionSummary(), customer, viewerRole),
                 d.getAssignedDomain(),
                 d.getAssignedUserId(),
                 assignee != null ? assignee.getFullName() : null,
                 d.getOriginalDisputeId(),
                 origRef,
                 piiMaskingService.toCustomerSummary(customer, viewerRole),
-                attachmentRepository.countByDisputeId(d.getId()),
+                attachmentCountById.getOrDefault(d.getId(), 0L),
                 d.getSourceChannel(),
-                d.getContactChannelMetadata(),
+                piiMaskingService.maskFreeText(d.getContactChannelMetadata(), customer, viewerRole),
                 d.getCreatedAt(),
                 d.getResolvedAt()
         );
@@ -956,7 +968,7 @@ public class DisputeService {
                 ? noteRepository.findByDisputeIdOrderByCreatedAtAsc(d.getId())
                 : noteRepository.findByDisputeIdAndInternalOnlyFalseOrderByCreatedAtAsc(d.getId());
 
-        List<NoteDto> notes = rawNotes.stream().map(this::toNoteDto).toList();
+        List<NoteDto> notes = rawNotes.stream().map(n -> toNoteDto(n, customer, viewerRole)).toList();
         List<AttachmentDto> attachments = attachmentRepository.findByDisputeIdOrderByCreatedAtAsc(d.getId())
                 .stream()
                 .map(attachmentStorageService::toDto)
@@ -978,11 +990,11 @@ public class DisputeService {
                         orig.getStatus(),
                         orig.getCategory(),
                         orig.getAmount(),
-                        orig.getReason(),
-                        orig.getResolutionSummary(),
+                        piiMaskingService.maskFreeText(orig.getReason(), customer, viewerRole),
+                        piiMaskingService.maskFreeText(orig.getResolutionSummary(), customer, viewerRole),
                         orig.getCreatedAt(),
                         orig.getResolvedAt(),
-                        origNotes.stream().map(this::toNoteDto).toList()
+                        origNotes.stream().map(n -> toNoteDto(n, customer, viewerRole)).toList()
                 );
             }
         }
@@ -1002,8 +1014,8 @@ public class DisputeService {
                 d.getStatus().isTerminal(),
                 d.getCategory(),
                 d.getAmount(),
-                d.getReason(),
-                d.getResolutionSummary(),
+                piiMaskingService.maskFreeText(d.getReason(), customer, viewerRole),
+                piiMaskingService.maskFreeText(d.getResolutionSummary(), customer, viewerRole),
                 d.getAssignedDomain(),
                 d.getAssignedUserId(),
                 assignee != null ? assignee.getFullName() : null,
@@ -1015,7 +1027,7 @@ public class DisputeService {
                 notes,
                 attachments,
                 d.getSourceChannel(),
-                d.getContactChannelMetadata(),
+                piiMaskingService.maskFreeText(d.getContactChannelMetadata(), customer, viewerRole),
                 d.getCreatedAt(),
                 d.getResolvedAt()
         );
@@ -1028,14 +1040,17 @@ public class DisputeService {
         return buildDetailDto(dispute, viewerRole);
     }
 
-    private NoteDto toNoteDto(DisputeNote n) {
+    private NoteDto toNoteDto(DisputeNote n, AppUser customer, UserRole viewerRole) {
+        String authorName = (viewerRole == UserRole.AFFILIATE && n.getAuthorRole() == UserRole.CUSTOMER)
+                ? piiMaskingService.maskName(n.getAuthorName())
+                : n.getAuthorName();
         return new NoteDto(
                 n.getId(),
                 n.getDisputeId(),
                 n.getAuthorId(),
-                n.getAuthorName(),
+                authorName,
                 n.getAuthorRole(),
-                n.getMessage(),
+                piiMaskingService.maskFreeText(n.getMessage(), customer, viewerRole),
                 n.isInternalOnly(),
                 n.isRequiresCustomerReply(),
                 n.getCreatedAt()

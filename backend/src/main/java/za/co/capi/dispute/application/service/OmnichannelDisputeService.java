@@ -32,6 +32,7 @@ public class OmnichannelDisputeService {
     private final DisputeService disputeService;
     private final NotificationEmailService notificationEmailService;
     private final AuditService auditService;
+    private final PiiMaskingService piiMaskingService;
 
     public OmnichannelDisputeService(
             AppUserRepository userRepository,
@@ -39,13 +40,15 @@ public class OmnichannelDisputeService {
             DisputeNoteRepository noteRepository,
             DisputeService disputeService,
             NotificationEmailService notificationEmailService,
-            AuditService auditService) {
+            AuditService auditService,
+            PiiMaskingService piiMaskingService) {
         this.userRepository = userRepository;
         this.transactionRepository = transactionRepository;
         this.noteRepository = noteRepository;
         this.disputeService = disputeService;
         this.notificationEmailService = notificationEmailService;
         this.auditService = auditService;
+        this.piiMaskingService = piiMaskingService;
     }
 
     @Transactional
@@ -63,16 +66,15 @@ public class OmnichannelDisputeService {
         BankTransaction tx = resolveTransaction(customer.getId(), request.transactionId(), request.messageBody(), actor, ipAddress);
 
         DisputeCategory inferredCategory = inferCategoryFromMessage(request.messageBody(), tx);
-        String merchant = tx != null ? tx.getMerchantName() : "Mobile Channel Reported Transaction";
-        String rail = tx != null ? tx.getPaymentRail() : "MOBILE_ALERT";
-        BigDecimal amount = tx != null ? tx.getAmount() : new BigDecimal("500.00");
+        String merchant = tx.getMerchantName();
+        String rail = tx.getPaymentRail();
+        BigDecimal amount = tx.getAmount();
 
-        String callerPhone = customer.getPhoneNumber() != null ? customer.getPhoneNumber() : "+27000000000";
-        String metadata = channel.name() + " Gateway | MSISDN: " + callerPhone
-                + (tx != null ? " | Matched: " + tx.getTransactionReference() : "");
+        String maskedPhone = piiMaskingService.maskPhone(customer.getPhoneNumber());
+        String metadata = channel.name() + " Gateway | Matched: " + tx.getTransactionReference();
 
         CreateDisputeRequest createReq = new CreateDisputeRequest(
-                tx != null ? tx.getId() : null,
+                tx.getId(),
                 merchant,
                 rail,
                 inferredCategory,
@@ -92,8 +94,8 @@ public class OmnichannelDisputeService {
                 metadata
         );
 
-        String transcript = "[" + channel.name() + " INBOUND from " + callerPhone + "]: \"" + request.messageBody().trim() + "\"";
-        saveChannelNote(created.id(), customer, transcript);
+        String transcript = "[" + channel.name() + " INBOUND (" + maskedPhone + ")]: \"" + request.messageBody().trim() + "\"";
+        saveInternalChannelNote(created.id(), customer, transcript);
 
         String outboundReply = String.format(
                 "Capi Bank %s Auto-Reply: Dispute %s has been logged for %s (R%s). We have flagged this for urgent review. Reply STATUS or open your portal to attach documents.",
@@ -136,21 +138,21 @@ public class OmnichannelDisputeService {
                 ? request.category()
                 : inferCategoryFromMessage(request.callerStatement(), tx);
 
-        String merchant = tx != null ? tx.getMerchantName() : "Call Centre Reported Merchant";
-        String rail = tx != null ? tx.getPaymentRail() : "CARD_POS";
-        BigDecimal amount = tx != null ? tx.getAmount() : new BigDecimal("500.00");
+        String merchant = tx.getMerchantName();
+        String rail = tx.getPaymentRail();
+        BigDecimal amount = tx.getAmount();
 
         String callId = "CALL-" + (100000 + RANDOM.nextInt(900000));
-        String callerPhone = customer.getPhoneNumber() != null ? customer.getPhoneNumber() : "+27000000000";
+        String maskedPhone = piiMaskingService.maskPhone(customer.getPhoneNumber());
         String scenarioTag = request.scenario() != null && !request.scenario().isBlank()
                 ? request.scenario().trim()
                 : "CUSTOMER_VOICE_REPORT";
 
-        String metadata = callId + " | Caller: " + callerPhone + " | Scenario: " + scenarioTag
+        String metadata = callId + " | Scenario: " + scenarioTag + " | Matched: " + tx.getTransactionReference()
                 + (request.cardFreezeRequested() ? " | Precautionary Card Hold" : "");
 
         CreateDisputeRequest createReq = new CreateDisputeRequest(
-                tx != null ? tx.getId() : null,
+                tx.getId(),
                 merchant,
                 rail,
                 category,
@@ -171,7 +173,7 @@ public class OmnichannelDisputeService {
         );
 
         StringBuilder transcript = new StringBuilder();
-        transcript.append("[VOICE CALL RECORDING ").append(callId).append(" | IVR Caller Verified: ").append(callerPhone).append("]\n")
+        transcript.append("[VOICE CALL RECORDING ").append(callId).append(" | IVR Caller Verified (").append(maskedPhone).append(")]\n")
                 .append("Scenario: ").append(scenarioTag).append("\n")
                 .append("Customer Statement: ").append(request.callerStatement().trim());
         if (request.agentNotes() != null && !request.agentNotes().isBlank()) {
@@ -181,7 +183,7 @@ public class OmnichannelDisputeService {
             transcript.append("\nAction Taken: Temporary precautionary card freeze flag requested during call.");
         }
 
-        saveChannelNote(created.id(), customer, transcript.toString());
+        saveInternalChannelNote(created.id(), customer, transcript.toString());
 
         String outboundReply = String.format(
                 "Voice Call %s completed. Dispute %s logged for %s (R%s)%s. Confirmation SMS/email sent to customer.",
@@ -207,19 +209,23 @@ public class OmnichannelDisputeService {
     }
 
     private AppUser resolveTargetCustomer(String phoneNumber, AppUserPrincipal actor, String ipAddress) {
+        if (phoneNumber == null || phoneNumber.isBlank()) {
+            throw ApiException.badRequest("Phone number is required for omnichannel dispute intake.");
+        }
+        String trimmedPhone = phoneNumber.trim();
+
         if (actor.getRole() == UserRole.CUSTOMER) {
             AppUser currentCustomer = userRepository.findById(actor.getId())
                     .orElseThrow(() -> ApiException.notFound("Authenticated customer profile not found."));
-            if (phoneNumber != null && !phoneNumber.isBlank()
-                    && currentCustomer.getPhoneNumber() != null
-                    && !phoneNumber.trim().equalsIgnoreCase(currentCustomer.getPhoneNumber().trim())) {
+            if (currentCustomer.getPhoneNumber() == null
+                    || !trimmedPhone.equalsIgnoreCase(currentCustomer.getPhoneNumber().trim())) {
                 auditService.logEvent(
                         actor.getId(),
                         actor.getEmail(),
                         "HIGH",
                         "UNAUTHORIZED_ACCESS_ATTEMPT",
                         "AppUser",
-                        phoneNumber.trim(),
+                        trimmedPhone,
                         ipAddress,
                         Map.of("reason", "Customer attempted omnichannel simulation using another MSISDN")
                 );
@@ -232,13 +238,8 @@ public class OmnichannelDisputeService {
             throw ApiException.forbidden("External affiliates cannot initiate omnichannel dispute intake.");
         }
 
-        if (phoneNumber != null && !phoneNumber.isBlank()) {
-            return userRepository.findFirstByPhoneNumber(phoneNumber.trim())
-                    .orElseThrow(() -> ApiException.notFound("No retail customer registered with phone number: " + phoneNumber));
-        }
-
-        return userRepository.findByEmailIgnoreCase("customer@capi.test")
-                .orElseThrow(() -> ApiException.notFound("Default demo customer not found."));
+        return userRepository.findFirstByPhoneNumber(trimmedPhone)
+                .orElseThrow(() -> ApiException.notFound("No retail customer registered with the provided phone number."));
     }
 
     private BankTransaction resolveTransaction(
@@ -266,8 +267,7 @@ public class OmnichannelDisputeService {
             }
         }
 
-        List<BankTransaction> customerTxs = transactionRepository.findByCustomerIdOrderByTransactedAtDesc(customerId);
-        return customerTxs.isEmpty() ? null : customerTxs.getFirst();
+        throw ApiException.badRequest("Transaction ID or transaction reference (TXN-YYYY-XXXX) is required for omnichannel dispute intake.");
     }
 
     private void verifyTransactionOwnership(BankTransaction tx, UUID customerId, AppUserPrincipal actor, String ipAddress) {
@@ -304,17 +304,16 @@ public class OmnichannelDisputeService {
         return DisputeCategory.UNAUTHORIZED_TRANSACTION;
     }
 
-    private void saveChannelNote(UUID disputeId, AppUser customer, String content) {
+    private void saveInternalChannelNote(UUID disputeId, AppUser customer, String content) {
         DisputeNote note = new DisputeNote();
         note.setDisputeId(disputeId);
         note.setAuthorId(customer.getId());
         note.setAuthorName(customer.getFullName());
         note.setAuthorRole(UserRole.CUSTOMER);
         note.setMessage(content);
-        note.setInternalOnly(false);
+        note.setInternalOnly(true);
         note.setRequiresCustomerReply(false);
         note.setCreatedAt(Instant.now());
         noteRepository.save(note);
     }
 }
-
