@@ -4,11 +4,15 @@ import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import za.co.capi.dispute.application.service.NotificationEmailService;
 import org.springframework.http.MediaType;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -47,6 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles({"demo", "test"})
+@ExtendWith(OutputCaptureExtension.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class OtpSecurityTest {
 
@@ -82,6 +87,7 @@ class OtpSecurityTest {
         AppUser customer = appUserRepository.findByEmailIgnoreCase("customer@capi.test").orElseThrow();
         customer.setLocked(false);
         customer.setLockedReason(null);
+        customer.setFullName("Thabo Mokoena");
         customer.setPasswordHash(passwordEncoder.encode("Password123!"));
         appUserRepository.save(customer);
     }
@@ -225,6 +231,32 @@ class OtpSecurityTest {
         }
     }
 
+    @Test
+    void otpIsNeverPresentInEmailSubjectOrApplicationLogsAndHtmlIsEscaped(CapturedOutput output) throws Exception {
+        AppUser customer = appUserRepository.findByEmailIgnoreCase("customer@capi.test").orElseThrow();
+        customer.setFullName("Thabo <script>alert(1)</script> Mokoena");
+        appUserRepository.save(customer);
+
+        String otpCode = triggerFraudLockAndCaptureOtp("customer@capi.test");
+
+        ArgumentCaptor<MimeMessage> mailCaptor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(javaMailSender, atLeastOnce()).send(mailCaptor.capture());
+        MimeMessage otpEmail = mailCaptor.getAllValues().getLast();
+        String body = otpEmail.getContent().toString();
+
+        assertThat(otpEmail.getSubject()).isEqualTo(NotificationEmailService.ACCOUNT_LOCKED_OTP_SUBJECT);
+        assertThat(otpEmail.getSubject()).doesNotContain(otpCode);
+        assertThat(body).contains(otpCode);
+        assertThat(body).contains("&lt;script&gt;alert(1)&lt;/script&gt;");
+        assertThat(body).doesNotContain("<script>alert(1)</script>");
+
+        String logs = output.getAll();
+        assertThat(logs).contains("ACCOUNT_LOCKED_OTP");
+        assertThat(logs).contains("cu****@capi.test");
+        assertThat(logs).doesNotContain(otpCode);
+        assertThat(logs).doesNotContain("customer@capi.test");
+    }
+
     private String triggerFraudLockAndCaptureOtp(String email) throws Exception {
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -243,17 +275,18 @@ class OtpSecurityTest {
         ArgumentCaptor<MimeMessage> mailCaptor = ArgumentCaptor.forClass(MimeMessage.class);
         verify(javaMailSender, atLeastOnce()).send(mailCaptor.capture());
         List<MimeMessage> sent = mailCaptor.getAllValues();
-        Pattern pattern = Pattern.compile("\\((\\d{6})\\)");
+        Pattern pattern = Pattern.compile("id=\"otp-code\"[^>]*>(\\d{6})</span>");
         for (int i = sent.size() - 1; i >= 0; i--) {
-            String subject = sent.get(i).getSubject();
-            if (subject != null) {
-                Matcher matcher = pattern.matcher(subject);
-                if (matcher.find()) {
-                    return matcher.group(1);
-                }
+            Object content = sent.get(i).getContent();
+            String body = content != null ? content.toString() : "";
+            Matcher matcher = pattern.matcher(body);
+            if (matcher.find()) {
+                String otpCode = matcher.group(1);
+                assertThat(sent.get(i).getSubject()).doesNotContain(otpCode);
+                return otpCode;
             }
         }
-        throw new IllegalStateException("No OTP found in email subjects");
+        throw new IllegalStateException("No OTP found in email bodies");
     }
 }
 

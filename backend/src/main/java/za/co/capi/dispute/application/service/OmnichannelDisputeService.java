@@ -199,7 +199,7 @@ public class OmnichannelDisputeService {
                 created.disputeReference(),
                 merchant,
                 amount.toPlainString(),
-                transcript.toString().replace("\n", "<br/>")
+                transcript.toString()
         );
 
         DisputeDetailDto refreshed = disputeService.refreshDetailDto(created.id(), actor.getRole());

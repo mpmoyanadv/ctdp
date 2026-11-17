@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 import za.co.capi.dispute.domain.model.DisputeChannel;
 import za.co.capi.dispute.infrastructure.messaging.KafkaEventService;
 
@@ -18,31 +19,38 @@ import java.util.Map;
 @Service
 public class NotificationEmailService {
 
+    public static final String ACCOUNT_LOCKED_OTP_SUBJECT = "Capi Security Lockdown: 6-Digit Verification Code";
     private static final Logger log = LoggerFactory.getLogger(NotificationEmailService.class);
 
     private final JavaMailSender mailSender;
     private final KafkaEventService kafkaEventService;
+    private final PiiMaskingService piiMaskingService;
     private final String frontendBaseUrl;
     private final String fromAddress;
 
     public NotificationEmailService(
             JavaMailSender mailSender,
             KafkaEventService kafkaEventService,
+            PiiMaskingService piiMaskingService,
             @Value("${app.frontend-base-url:http://localhost:4200}") String frontendBaseUrl,
             @Value("${app.mail.from:security-alerts@capi.test}") String fromAddress) {
         this.mailSender = mailSender;
         this.kafkaEventService = kafkaEventService;
+        this.piiMaskingService = piiMaskingService;
         this.frontendBaseUrl = frontendBaseUrl;
         this.fromAddress = fromAddress;
     }
 
     public void sendCustomerLoginAlert(String recipientEmail, String fullName, String fraudToken, String ipAddress) {
+        String maskedRecipient = piiMaskingService.maskEmail(recipientEmail);
+        String safeIp = ipAddress != null ? ipAddress : "127.0.0.1";
         kafkaEventService.publishAlertNotificationEvent(
                 "CUSTOMER_LOGIN_SECURITY_ALERT",
-                recipientEmail,
-                Map.of("recipientEmail", recipientEmail, "ipAddress", ipAddress != null ? ipAddress : "127.0.0.1")
+                maskedRecipient,
+                Map.of("recipientEmail", maskedRecipient, "ipAddress", safeIp)
         );
         String secureLink = frontendBaseUrl + "/fraud-report?token=" + URLEncoder.encode(fraudToken, StandardCharsets.UTF_8);
+        String escapedLink = escapeHtml(secureLink);
         String subject = "Capi Security Alert: New login detected";
         String html = """
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
@@ -62,19 +70,26 @@ public class NotificationEmailService {
                     <p style="font-size: 12px; color: #64748b;">Direct link: <a href="%s">%s</a></p>
                   </div>
                 </div>
-                """.formatted(fullName, Instant.now().toString(), ipAddress, secureLink, secureLink, secureLink);
+                """.formatted(
+                escapeHtml(fullName),
+                escapeHtml(Instant.now().toString()),
+                escapeHtml(safeIp),
+                escapedLink,
+                escapedLink,
+                escapedLink
+        );
 
-        sendHtmlEmail(recipientEmail, subject, html);
+        sendHtmlEmail("CUSTOMER_LOGIN_ALERT", recipientEmail, subject, html);
     }
 
     public void sendAccountLockedOtpEmail(String recipientEmail, String fullName, String otpCode) {
+        String maskedRecipient = piiMaskingService.maskEmail(recipientEmail);
         kafkaEventService.publishAlertNotificationEvent(
                 "ACCOUNT_LOCKED_FRAUD_OTP_DISPATCHED",
-                recipientEmail,
-                Map.of("recipientEmail", recipientEmail, "otpLength", otpCode != null ? otpCode.length() : 6)
+                maskedRecipient,
+                Map.of("recipientEmail", maskedRecipient, "otpLength", otpCode != null ? otpCode.length() : 6)
         );
         String resetLink = frontendBaseUrl + "/reset-password-verify?email=" + URLEncoder.encode(recipientEmail, StandardCharsets.UTF_8);
-        String subject = "Capi Security Lockdown: 6-Digit Verification Code (" + otpCode + ")";
         String html = """
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #fecaca; border-radius: 8px; overflow: hidden;">
                   <div style="background: #991b1b; color: #ffffff; padding: 18px 24px;">
@@ -95,16 +110,22 @@ public class NotificationEmailService {
                     </div>
                   </div>
                 </div>
-                """.formatted(fullName, otpCode, resetLink);
+                """.formatted(
+                escapeHtml(fullName),
+                escapeHtml(otpCode),
+                escapeHtml(resetLink)
+        );
 
-        sendHtmlEmail(recipientEmail, subject, html);
+        sendHtmlEmail("ACCOUNT_LOCKED_OTP", recipientEmail, ACCOUNT_LOCKED_OTP_SUBJECT, html);
     }
 
     public void sendEscalationNotification(String adminEmail, String disputeReference, String escalatedByEmail) {
+        String maskedAdmin = piiMaskingService.maskEmail(adminEmail);
+        String maskedEscalatedBy = piiMaskingService.maskEmail(escalatedByEmail);
         kafkaEventService.publishAlertNotificationEvent(
                 "SUPERVISOR_ESCALATION_ALERT",
                 disputeReference,
-                Map.of("adminEmail", adminEmail, "disputeReference", disputeReference, "escalatedBy", escalatedByEmail)
+                Map.of("adminEmail", maskedAdmin, "disputeReference", disputeReference, "escalatedBy", maskedEscalatedBy)
         );
         String subject = "Escalation Alert: Dispute " + disputeReference + " requires supervisor reassignment";
         String html = """
@@ -114,8 +135,8 @@ public class NotificationEmailService {
                   <p>Escalated By: %s</p>
                   <p>Status is now <strong>ESCALATED</strong> and unassigned awaiting Admin review.</p>
                 </div>
-                """.formatted(disputeReference, escalatedByEmail);
-        sendHtmlEmail(adminEmail, subject, html);
+                """.formatted(escapeHtml(disputeReference), escapeHtml(escalatedByEmail));
+        sendHtmlEmail("SUPERVISOR_ESCALATION_ALERT", adminEmail, subject, html);
     }
 
     public void sendOmnichannelDisputeConfirmation(
@@ -127,11 +148,12 @@ public class NotificationEmailService {
             String amount,
             String summaryText) {
 
+        String maskedRecipient = piiMaskingService.maskEmail(recipientEmail);
         kafkaEventService.publishAlertNotificationEvent(
                 "OMNICHANNEL_DISPUTE_CONFIRMATION_" + channel.name(),
                 disputeReference,
                 Map.of(
-                        "recipientEmail", recipientEmail,
+                        "recipientEmail", maskedRecipient,
                         "channel", channel.name(),
                         "disputeReference", disputeReference,
                         "merchantName", merchantName,
@@ -139,6 +161,7 @@ public class NotificationEmailService {
                 )
         );
         String subject = "Capi Bank (" + channel.name() + "): Dispute " + disputeReference + " Logged";
+        String escapedSummary = escapeHtml(summaryText).replace("\n", "<br/>");
         String html = """
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden;">
                   <div style="background: #00529B; color: #ffffff; padding: 16px 22px;">
@@ -155,11 +178,21 @@ public class NotificationEmailService {
                     <p style="background: #f8fafc; border-left: 4px solid #00529B; padding: 10px 14px; font-size: 13px;">%s</p>
                   </div>
                 </div>
-                """.formatted(channel.name(), disputeReference, fullName, channel.name(), disputeReference, merchantName, amount, summaryText);
-        sendHtmlEmail(recipientEmail, subject, html);
+                """.formatted(
+                escapeHtml(channel.name()),
+                escapeHtml(disputeReference),
+                escapeHtml(fullName),
+                escapeHtml(channel.name()),
+                escapeHtml(disputeReference),
+                escapeHtml(merchantName),
+                escapeHtml(amount),
+                escapedSummary
+        );
+        sendHtmlEmail("OMNICHANNEL_DISPUTE_CONFIRMATION", recipientEmail, subject, html);
     }
 
-    private void sendHtmlEmail(String to, String subject, String htmlBody) {
+    private void sendHtmlEmail(String templateName, String to, String subject, String htmlBody) {
+        String maskedRecipient = piiMaskingService.maskEmail(to);
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
@@ -168,10 +201,13 @@ public class NotificationEmailService {
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
             mailSender.send(message);
-            log.info("Dispatched email '{}' to {}", subject, to);
+            log.info("Dispatched email template '{}' to {}", templateName, maskedRecipient);
         } catch (Exception ex) {
-            log.warn("Unable to dispatch email '{}' to {}: {}", subject, to, ex.getMessage());
+            log.warn("Unable to dispatch email template '{}' to {}: {}", templateName, maskedRecipient, ex.getMessage());
         }
     }
-}
 
+    private static String escapeHtml(String value) {
+        return value == null ? "" : HtmlUtils.htmlEscape(value, StandardCharsets.UTF_8.name());
+    }
+}

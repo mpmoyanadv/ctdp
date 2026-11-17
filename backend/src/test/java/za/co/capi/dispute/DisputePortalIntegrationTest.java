@@ -144,7 +144,7 @@ class DisputePortalIntegrationTest {
         assertThat(otp.getOtpHash()).startsWith("$2");
         ArgumentCaptor<MimeMessage> mailCaptor = ArgumentCaptor.forClass(MimeMessage.class);
         verify(javaMailSender, atLeastOnce()).send(mailCaptor.capture());
-        String otpCode = extractOtpFromSubjects(mailCaptor.getAllValues());
+        String otpCode = extractOtpFromEmailBodies(mailCaptor.getAllValues());
 
         mockMvc.perform(post("/api/v1/auth/reset-password-verify")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -319,18 +319,17 @@ class DisputePortalIntegrationTest {
         return objectMapper.readTree(res.getResponse().getContentAsString()).get("accessToken").asText();
     }
 
-    private String extractOtpFromSubjects(List<MimeMessage> messages) throws Exception {
-        Pattern pattern = Pattern.compile("\\((\\d{6})\\)");
+    private String extractOtpFromEmailBodies(List<MimeMessage> messages) throws Exception {
+        Pattern pattern = Pattern.compile("id=\"otp-code\"[^>]*>(\\d{6})</span>");
         for (int i = messages.size() - 1; i >= 0; i--) {
-            String subject = messages.get(i).getSubject();
-            if (subject != null) {
-                Matcher matcher = pattern.matcher(subject);
-                if (matcher.find()) {
-                    return matcher.group(1);
-                }
+            Object content = messages.get(i).getContent();
+            String body = content != null ? content.toString() : "";
+            Matcher matcher = pattern.matcher(body);
+            if (matcher.find()) {
+                return matcher.group(1);
             }
         }
-        throw new IllegalStateException("No 6-digit OTP found in dispatched emails");
+        throw new IllegalStateException("No 6-digit OTP found in dispatched email bodies");
     }
 }
 
