@@ -70,6 +70,10 @@ public class Dispute {
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 
+    @Version
+    @Column(nullable = false)
+    private Long version = 0L;
+
     public Dispute() {
     }
 
@@ -215,6 +219,14 @@ public class Dispute {
 
     public void setResolvedAt(Instant resolvedAt) {
         this.resolvedAt = resolvedAt;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 }
 

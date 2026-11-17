@@ -1,5 +1,7 @@
 package za.co.capi.dispute.application.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -17,7 +19,6 @@ import za.co.capi.dispute.presentation.dto.ApiDtos.*;
 import za.co.capi.dispute.presentation.exception.ApiException;
 
 import java.math.BigDecimal;
-import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -27,7 +28,9 @@ import java.util.stream.Collectors;
 @Service
 public class DisputeService {
 
-    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final Logger log = LoggerFactory.getLogger(DisputeService.class);
+    private static final BigDecimal MIN_DISPUTE_AMOUNT = new BigDecimal("0.01");
+    private static final BigDecimal MAX_DISPUTE_AMOUNT = new BigDecimal("9999999.99");
     private static final Set<DisputeStatus> TERMINAL_STATUSES = EnumSet.of(
             DisputeStatus.RESOLVED,
             DisputeStatus.REFUNDED,
@@ -177,6 +180,8 @@ public class DisputeService {
             DisputeChannel sourceChannel,
             String contactChannelMetadata) {
 
+        validateCreateDisputeRequest(request);
+
         String lockKey = idempotencyLockService.buildDisputeLockKey(customerId, request, idempotencyKey);
         if (!idempotencyLockService.tryAcquireLock(lockKey, Instant.now().toString())) {
             auditService.logEvent(
@@ -206,6 +211,8 @@ public class DisputeService {
                 BankTransaction tx = transactionRepository.findById(request.transactionId())
                         .orElseThrow(() -> ApiException.notFound("Referenced bank transaction not found."));
                 if (!tx.getCustomerId().equals(customerId)) {
+                    log.warn("Dispute access denied: action=CREATE_DISPUTE_FOREIGN_TX targetId={} actorId={} role={}",
+                            tx.getId(), customerId, viewerRole);
                     auditService.logEvent(
                             customerId,
                             actorEmail,
@@ -298,6 +305,9 @@ public class DisputeService {
                     )
             );
 
+            log.info("Dispute created: disputeId={} customerId={} status={} channel={}",
+                    saved.getId(), customerId, saved.getStatus(), saved.getSourceChannel());
+
             return buildDetailDto(saved, viewerRole);
         } catch (RuntimeException ex) {
             idempotencyLockService.releaseLock(lockKey);
@@ -313,6 +323,8 @@ public class DisputeService {
             String ipAddress) {
 
         if (actor.getRole() == UserRole.AFFILIATE) {
+            log.warn("Dispute access denied: action=UPLOAD_ATTACHMENT targetId={} actorId={} role={}",
+                    disputeId, actor.getId(), actor.getRole());
             auditService.logEvent(
                     actor.getId(),
                     actor.getEmail(),
@@ -345,17 +357,23 @@ public class DisputeService {
     @Transactional
     public DisputeDetailDto claimDispute(UUID disputeId, AppUserPrincipal actor, String ipAddress) {
         if (actor.getRole() != UserRole.STAFF && actor.getRole() != UserRole.ADMIN) {
+            log.warn("Dispute access denied: action=CLAIM_DISPUTE targetId={} actorId={} role={}",
+                    disputeId, actor.getId(), actor.getRole());
             throw ApiException.forbidden("Only internal Capi Staff or Admin can claim disputes.");
         }
         Dispute dispute = findDisputeAndVerifyBoundary(disputeId, actor, ipAddress, "CLAIM_DISPUTE");
-        DisputeTransitionPolicy.validateTransition(dispute.getStatus(), DisputeStatus.IN_REVIEW, actor.getRole());
+        DisputeStatus previousStatus = dispute.getStatus();
+        DisputeTransitionPolicy.validateTransition(previousStatus, DisputeStatus.IN_REVIEW, actor.getRole());
 
         dispute.setAssignedUserId(actor.getId());
         dispute.setAssignedDomain(UserDomain.INTERNAL_CAPI);
         dispute.setStatus(DisputeStatus.IN_REVIEW);
-        disputeRepository.save(dispute);
+        dispute = disputeRepository.saveAndFlush(dispute);
 
         productivityService.startWorkSession(dispute.getId(), actor.getId());
+
+        log.info("Dispute status transition: disputeId={} fromStatus={} toStatus={} actorId={} role={}",
+                dispute.getId(), previousStatus, DisputeStatus.IN_REVIEW, actor.getId(), actor.getRole());
 
         auditService.logEvent(
                 actor.getId(),
@@ -402,11 +420,19 @@ public class DisputeService {
         noteRepository.save(note);
 
         if (requiresReply) {
+            DisputeStatus previousStatus = dispute.getStatus();
+            DisputeTransitionPolicy.validateTransition(previousStatus, DisputeStatus.PENDING_CUSTOMER_ACTION, actor.getRole());
             dispute.setStatus(DisputeStatus.PENDING_CUSTOMER_ACTION);
-            disputeRepository.save(dispute);
+            dispute = disputeRepository.saveAndFlush(dispute);
+            log.info("Dispute status transition: disputeId={} fromStatus={} toStatus={} actorId={} role={}",
+                    dispute.getId(), previousStatus, DisputeStatus.PENDING_CUSTOMER_ACTION, actor.getId(), actor.getRole());
         } else if (actor.getRole() == UserRole.CUSTOMER && dispute.getStatus() == DisputeStatus.PENDING_CUSTOMER_ACTION) {
+            DisputeStatus previousStatus = dispute.getStatus();
+            DisputeTransitionPolicy.validateTransition(previousStatus, DisputeStatus.IN_REVIEW, actor.getRole());
             dispute.setStatus(DisputeStatus.IN_REVIEW);
-            disputeRepository.save(dispute);
+            dispute = disputeRepository.saveAndFlush(dispute);
+            log.info("Dispute status transition: disputeId={} fromStatus={} toStatus={} actorId={} role={}",
+                    dispute.getId(), previousStatus, DisputeStatus.IN_REVIEW, actor.getId(), actor.getRole());
         }
 
         auditService.logEvent(
@@ -434,14 +460,18 @@ public class DisputeService {
             throw ApiException.forbidden("External affiliates cannot escalate internal supervisor queues directly.");
         }
         Dispute dispute = findDisputeAndVerifyBoundary(disputeId, actor, ipAddress, "ESCALATE_DISPUTE");
-        DisputeTransitionPolicy.validateTransition(dispute.getStatus(), DisputeStatus.ESCALATED, actor.getRole());
+        DisputeStatus previousStatus = dispute.getStatus();
+        DisputeTransitionPolicy.validateTransition(previousStatus, DisputeStatus.ESCALATED, actor.getRole());
 
         productivityService.closeActiveSessionsForDispute(dispute.getId());
 
         dispute.setStatus(DisputeStatus.ESCALATED);
         dispute.setAssignedUserId(null);
         dispute.setAssignedDomain(UserDomain.INTERNAL_CAPI);
-        disputeRepository.save(dispute);
+        dispute = disputeRepository.saveAndFlush(dispute);
+
+        log.info("Dispute status transition: disputeId={} fromStatus={} toStatus={} actorId={} role={}",
+                dispute.getId(), previousStatus, DisputeStatus.ESCALATED, actor.getId(), actor.getRole());
 
         if (reasonNote != null && !reasonNote.isBlank()) {
             DisputeNote note = new DisputeNote();
@@ -496,14 +526,18 @@ public class DisputeService {
         }
 
         Dispute dispute = findDisputeAndVerifyBoundary(disputeId, actor, ipAddress, "DELEGATE_DISPUTE");
-        DisputeTransitionPolicy.validateTransition(dispute.getStatus(), DisputeStatus.PENDING_EXTERNAL_REVIEW, actor.getRole());
+        DisputeStatus previousStatus = dispute.getStatus();
+        DisputeTransitionPolicy.validateTransition(previousStatus, DisputeStatus.PENDING_EXTERNAL_REVIEW, actor.getRole());
 
         productivityService.closeActiveSessionsForDispute(dispute.getId());
 
         dispute.setAssignedDomain(request.partnerDomain());
         dispute.setAssignedUserId(null);
         dispute.setStatus(DisputeStatus.PENDING_EXTERNAL_REVIEW);
-        disputeRepository.save(dispute);
+        dispute = disputeRepository.saveAndFlush(dispute);
+
+        log.info("Dispute status transition: disputeId={} fromStatus={} toStatus={} actorId={} role={}",
+                dispute.getId(), previousStatus, DisputeStatus.PENDING_EXTERNAL_REVIEW, actor.getId(), actor.getRole());
 
         if (request.note() != null && !request.note().isBlank()) {
             DisputeNote note = new DisputeNote();
@@ -548,6 +582,8 @@ public class DisputeService {
     @Transactional
     public DisputeDetailDto updateStatus(UUID disputeId, StatusUpdateRequest request, AppUserPrincipal actor, String ipAddress) {
         if (actor.getRole() != UserRole.STAFF && actor.getRole() != UserRole.ADMIN) {
+            log.warn("Dispute access denied: action=UPDATE_STATUS targetId={} actorId={} role={}",
+                    disputeId, actor.getId(), actor.getRole());
             auditService.logEvent(
                     actor.getId(),
                     actor.getEmail(),
@@ -566,8 +602,9 @@ public class DisputeService {
         }
 
         Dispute dispute = findDisputeAndVerifyBoundary(disputeId, actor, ipAddress, "UPDATE_STATUS");
+        DisputeStatus previousStatus = dispute.getStatus();
         DisputeStatus newStatus = request.status();
-        DisputeTransitionPolicy.validateTransition(dispute.getStatus(), newStatus, actor.getRole());
+        DisputeTransitionPolicy.validateTransition(previousStatus, newStatus, actor.getRole());
 
         dispute.setStatus(newStatus);
         if (newStatus == DisputeStatus.IN_REVIEW && dispute.getAssignedDomain() != UserDomain.INTERNAL_CAPI) {
@@ -585,7 +622,10 @@ public class DisputeService {
             productivityService.startWorkSession(dispute.getId(), actor.getId());
         }
 
-        disputeRepository.save(dispute);
+        dispute = disputeRepository.saveAndFlush(dispute);
+
+        log.info("Dispute status transition: disputeId={} fromStatus={} toStatus={} actorId={} role={}",
+                dispute.getId(), previousStatus, newStatus, actor.getId(), actor.getRole());
 
         if (request.resolutionSummary() != null && !request.resolutionSummary().isBlank()) {
             DisputeNote note = new DisputeNote();
@@ -653,6 +693,7 @@ public class DisputeService {
             validateAssigneeCompatibility(assignee, targetDomain);
         }
 
+        DisputeStatus previousStatus = dispute.getStatus();
         DisputeStatus targetStatus = request.status();
         if (targetStatus == null) {
             if (targetDomain == UserDomain.PARTNER_BANKSERV || targetDomain == UserDomain.PARTNER_MERCHANT) {
@@ -661,8 +702,8 @@ public class DisputeService {
                 targetStatus = DisputeStatus.IN_REVIEW;
             }
         }
-        if (targetStatus != null && targetStatus != dispute.getStatus()) {
-            DisputeTransitionPolicy.validateTransition(dispute.getStatus(), targetStatus, admin.getRole());
+        if (targetStatus != null && targetStatus != previousStatus) {
+            DisputeTransitionPolicy.validateTransition(previousStatus, targetStatus, admin.getRole());
         }
 
         productivityService.closeActiveSessionsForDispute(dispute.getId());
@@ -679,7 +720,10 @@ public class DisputeService {
             }
         }
 
-        disputeRepository.save(dispute);
+        dispute = disputeRepository.saveAndFlush(dispute);
+
+        log.info("Dispute status transition: disputeId={} fromStatus={} toStatus={} actorId={} role={}",
+                dispute.getId(), previousStatus, dispute.getStatus(), admin.getId(), admin.getRole());
 
         auditService.logEvent(
                 admin.getId(),
@@ -786,6 +830,8 @@ public class DisputeService {
         Optional<Dispute> disputeOpt = disputeRepository.findById(disputeId);
         if (disputeOpt.isEmpty()) {
             if (actor.getRole() == UserRole.CUSTOMER || actor.getRole() == UserRole.AFFILIATE) {
+                log.warn("Dispute access denied: action={} targetId={} actorId={} role={}",
+                        attemptedAction, disputeId, actor.getId(), actor.getRole());
                 auditService.logEvent(
                         actor.getId(),
                         actor.getEmail(),
@@ -810,6 +856,8 @@ public class DisputeService {
         Dispute dispute = disputeOpt.get();
 
         if (actor.getRole() == UserRole.CUSTOMER && !dispute.getCustomerId().equals(actor.getId())) {
+            log.warn("Dispute access denied: action={} targetId={} actorId={} role={}",
+                    attemptedAction, dispute.getId(), actor.getId(), actor.getRole());
             auditService.logEvent(
                     actor.getId(),
                     actor.getEmail(),
@@ -832,6 +880,8 @@ public class DisputeService {
         }
 
         if (actor.getRole() == UserRole.AFFILIATE && dispute.getAssignedDomain() != actor.getUserDomain()) {
+            log.warn("Dispute access denied: action={} targetId={} actorId={} role={}",
+                    attemptedAction, dispute.getId(), actor.getId(), actor.getRole());
             auditService.logEvent(
                     actor.getId(),
                     actor.getEmail(),
@@ -992,10 +1042,31 @@ public class DisputeService {
         );
     }
 
+    private void validateCreateDisputeRequest(CreateDisputeRequest request) {
+        if (request == null) {
+            throw ApiException.badRequest("Dispute payload is required.");
+        }
+        if (request.category() == null) {
+            throw ApiException.badRequest("Dispute category is required.");
+        }
+        if (request.amount() == null
+                || request.amount().compareTo(MIN_DISPUTE_AMOUNT) < 0
+                || request.amount().compareTo(MAX_DISPUTE_AMOUNT) > 0) {
+            throw ApiException.badRequest("Amount must be between 0.01 and 9999999.99.");
+        }
+        if (Math.max(0, request.amount().stripTrailingZeros().scale()) > 2) {
+            throw ApiException.badRequest("Amount must have at most 2 decimal places.");
+        }
+        String trimmedReason = request.reason() != null ? request.reason().trim() : "";
+        if (trimmedReason.length() < 5 || trimmedReason.length() > 2000) {
+            throw ApiException.badRequest("Reason must be between 5 and 2000 characters.");
+        }
+    }
+
     private String generateDisputeReference() {
         int year = ZonedDateTime.now(ZoneOffset.UTC).getYear();
-        int num = 10000 + RANDOM.nextInt(90000);
-        return "DSP-" + year + "-" + num;
+        long seq = disputeRepository.getNextDisputeReferenceSequence();
+        return String.format("DSP-%d-%05d", year, seq);
     }
 }
 

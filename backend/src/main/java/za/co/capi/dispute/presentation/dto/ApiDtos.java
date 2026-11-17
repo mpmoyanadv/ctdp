@@ -1,7 +1,9 @@
 package za.co.capi.dispute.presentation.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -113,12 +115,20 @@ public final class ApiDtos {
             @Schema(description = "Disputed monetary amount in ZAR", example = "450.00")
             @NotNull(message = "Dispute amount is required")
             @DecimalMin(value = "0.01", message = "Amount must be greater than zero")
+            @DecimalMax(value = "9999999.99", message = "Amount must not exceed 9999999.99")
+            @Digits(integer = 7, fraction = 2, message = "Amount must have at most 7 integer digits and 2 decimal places")
             BigDecimal amount,
             @Schema(description = "Customer's formal statement explaining the dispute", example = "Unauthorized online card debit not initiated by me.")
             @NotBlank(message = "Dispute reason is required")
             @Size(min = 5, max = 2000, message = "Reason must be between 5 and 2000 characters")
             String reason
-    ) {}
+    ) {
+        public CreateDisputeRequest {
+            if (reason != null) {
+                reason = reason.trim();
+            }
+        }
+    }
 
     @Schema(description = "Request payload to re-open a previously REJECTED dispute by filing a new linked case (`original_dispute_id`).")
     public record ReopenDisputeRequest(
@@ -128,7 +138,13 @@ public final class ApiDtos {
             @NotBlank(message = "Updated explanation is required to file a linked dispute")
             @Size(min = 5, max = 2000)
             String reason
-    ) {}
+    ) {
+        public ReopenDisputeRequest {
+            if (reason != null) {
+                reason = reason.trim();
+            }
+        }
+    }
 
     @Schema(description = "Investigation or customer communication note appended to an active dispute.")
     public record AddNoteRequest(
@@ -138,7 +154,13 @@ public final class ApiDtos {
             String message,
             @Schema(description = "If true, note is restricted to internal Capi staff/admin and hidden from Customer UI") boolean internalOnly,
             @Schema(description = "If true, transitions dispute status to `PENDING_CUSTOMER_ACTION` awaiting customer response") boolean requiresCustomerReply
-    ) {}
+    ) {
+        public AddNoteRequest {
+            if (message != null) {
+                message = message.trim();
+            }
+        }
+    }
 
     @Schema(description = "State machine transition request (`IN_REVIEW`, `PENDING_CUSTOMER_ACTION`, `RESOLVED`, `REFUNDED`, `REJECTED`).")
     public record StatusUpdateRequest(

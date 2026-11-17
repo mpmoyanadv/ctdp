@@ -105,6 +105,17 @@ class FlywayMigrationAndConstraintTest {
         orphanDispute.setReason("Testing foreign key enforcement");
         assertThatThrownBy(() -> disputeRepository.saveAndFlush(orphanDispute))
                 .isInstanceOf(DataIntegrityViolationException.class);
+
+        // Check constraint chk_disputes_amount_positive rejects amount <= 0
+        Dispute nonPositiveDispute = new Dispute();
+        nonPositiveDispute.setDisputeReference("DSP-FLYWAY-CHK-01");
+        nonPositiveDispute.setMerchantName("Check Test Merchant");
+        nonPositiveDispute.setCustomerId(customer.getId());
+        nonPositiveDispute.setCategory(DisputeCategory.UNAUTHORIZED_TRANSACTION);
+        nonPositiveDispute.setAmount(new BigDecimal("-1.00"));
+        nonPositiveDispute.setReason("Testing positive amount check constraint");
+        assertThatThrownBy(() -> disputeRepository.saveAndFlush(nonPositiveDispute))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 }
 

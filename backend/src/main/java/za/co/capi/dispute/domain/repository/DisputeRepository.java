@@ -3,6 +3,7 @@ package za.co.capi.dispute.domain.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import za.co.capi.dispute.domain.model.Dispute;
 import za.co.capi.dispute.domain.model.DisputeStatus;
 import za.co.capi.dispute.domain.model.UserDomain;
@@ -22,5 +23,8 @@ public interface DisputeRepository extends JpaRepository<Dispute, UUID> {
     List<Dispute> findAllByOrderByCreatedAtDesc();
     List<Dispute> findByOriginalDisputeIdOrderByCreatedAtDesc(UUID originalDisputeId);
     boolean existsByTransactionIdAndStatusNotIn(UUID transactionId, Collection<DisputeStatus> statuses);
+
+    @Query(value = "SELECT nextval('dispute_ref_seq')", nativeQuery = true)
+    long getNextDisputeReferenceSequence();
 }
 
