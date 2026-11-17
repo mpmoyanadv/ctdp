@@ -38,7 +38,7 @@ class AuditCsvSanitizationTest {
     void exportImmutableCsvNeutralizesFormulaInjectionAcrossAuditColumns() {
         AuditLogRepository repo = mock(AuditLogRepository.class);
         KafkaEventService kafka = new KafkaEventService(null, new ObjectMapper(), false);
-        AuditService service = new AuditService(repo, new ObjectMapper(), kafka, List.of());
+        AuditService service = new AuditService(repo, new ObjectMapper(), kafka);
 
         AuditLog entry = new AuditLog();
         entry.setId(42L);

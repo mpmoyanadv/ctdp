@@ -16,13 +16,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import za.co.capi.dispute.application.service.AuditService;
 import za.co.capi.dispute.application.service.DisputeService;
 import za.co.capi.dispute.domain.model.DisputeAttachment;
 import za.co.capi.dispute.domain.model.DisputeCategory;
 import za.co.capi.dispute.domain.model.DisputeStatus;
 import za.co.capi.dispute.infrastructure.config.OpenApiConfig;
 import za.co.capi.dispute.infrastructure.security.AppUserPrincipal;
+import za.co.capi.dispute.infrastructure.security.ClientIpResolver;
 import za.co.capi.dispute.presentation.dto.ApiDtos.*;
 
 import java.math.BigDecimal;
@@ -37,9 +37,11 @@ import java.util.UUID;
 public class DisputeController {
 
     private final DisputeService disputeService;
+    private final ClientIpResolver clientIpResolver;
 
-    public DisputeController(DisputeService disputeService) {
+    public DisputeController(DisputeService disputeService, ClientIpResolver clientIpResolver) {
         this.disputeService = disputeService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @Operation(
@@ -80,7 +82,7 @@ public class DisputeController {
             @Parameter(description = "Target dispute UUID", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal AppUserPrincipal principal,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         return ResponseEntity.ok(disputeService.getDisputeDetail(id, principal, ip));
     }
 
@@ -104,7 +106,7 @@ public class DisputeController {
             @Valid @RequestBody CreateDisputeRequest request,
             @AuthenticationPrincipal AppUserPrincipal principal,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(disputeService.createDispute(request, List.of(), principal, ip, idempotencyKey));
     }
@@ -133,7 +135,7 @@ public class DisputeController {
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
             @AuthenticationPrincipal AppUserPrincipal principal,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         CreateDisputeRequest req = new CreateDisputeRequest(transactionId, merchantName, paymentRail, category, amount, reason);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(disputeService.createDispute(req, files, principal, ip, idempotencyKey));
@@ -157,7 +159,7 @@ public class DisputeController {
             @RequestParam("files") List<MultipartFile> files,
             @AuthenticationPrincipal AppUserPrincipal principal,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(disputeService.uploadAttachments(id, files, principal, ip));
     }
@@ -172,7 +174,7 @@ public class DisputeController {
             @PathVariable UUID attachmentId,
             @AuthenticationPrincipal AppUserPrincipal principal,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         DisputeAttachment attachment = disputeService.getAuthorizedAttachment(id, attachmentId, principal, ip);
         Resource resource = disputeService.loadAttachmentFile(attachment);
         return ResponseEntity.ok()
@@ -193,7 +195,7 @@ public class DisputeController {
             @PathVariable UUID id,
             @AuthenticationPrincipal AppUserPrincipal principal,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         return ResponseEntity.ok(disputeService.claimDispute(id, principal, ip));
     }
 
@@ -212,7 +214,7 @@ public class DisputeController {
             @Valid @RequestBody AddNoteRequest request,
             @AuthenticationPrincipal AppUserPrincipal principal,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         return ResponseEntity.ok(disputeService.addNote(id, request, principal, ip));
     }
 
@@ -228,7 +230,7 @@ public class DisputeController {
             @RequestBody(required = false) Map<String, String> payload,
             @AuthenticationPrincipal AppUserPrincipal principal,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         String reason = payload != null ? payload.get("reason") : null;
         return ResponseEntity.ok(disputeService.escalateDispute(id, reason, principal, ip));
     }
@@ -245,7 +247,7 @@ public class DisputeController {
             @Valid @RequestBody DelegateDisputeRequest request,
             @AuthenticationPrincipal AppUserPrincipal principal,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         return ResponseEntity.ok(disputeService.delegateToAffiliate(id, request, principal, ip));
     }
 
@@ -259,7 +261,7 @@ public class DisputeController {
             @Valid @RequestBody StatusUpdateRequest request,
             @AuthenticationPrincipal AppUserPrincipal principal,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         return ResponseEntity.ok(disputeService.updateStatus(id, request, principal, ip));
     }
 
@@ -273,7 +275,7 @@ public class DisputeController {
             @Valid @RequestBody StatusUpdateRequest request,
             @AuthenticationPrincipal AppUserPrincipal principal,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         return ResponseEntity.ok(disputeService.updateStatus(id, request, principal, ip));
     }
 
@@ -293,7 +295,7 @@ public class DisputeController {
             @Valid @RequestBody ReopenDisputeRequest request,
             @AuthenticationPrincipal AppUserPrincipal principal,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(disputeService.reopenRejectedDispute(id, request, principal, ip));
     }

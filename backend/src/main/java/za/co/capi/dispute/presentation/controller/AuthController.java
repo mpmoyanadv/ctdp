@@ -13,8 +13,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import za.co.capi.dispute.application.service.AuditService;
 import za.co.capi.dispute.application.service.AuthService;
+import za.co.capi.dispute.infrastructure.security.ClientIpResolver;
 import za.co.capi.dispute.presentation.dto.ApiDtos.*;
 
 import java.net.URI;
@@ -28,12 +28,15 @@ import java.nio.charset.StandardCharsets;
 public class AuthController {
 
     private final AuthService authService;
+    private final ClientIpResolver clientIpResolver;
     private final String frontendBaseUrl;
 
     public AuthController(
             AuthService authService,
+            ClientIpResolver clientIpResolver,
             @Value("${app.frontend-base-url:http://localhost:4200}") String frontendBaseUrl) {
         this.authService = authService;
+        this.clientIpResolver = clientIpResolver;
         this.frontendBaseUrl = frontendBaseUrl;
     }
 
@@ -55,7 +58,7 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         return ResponseEntity.ok(authService.login(request, ip));
     }
 
@@ -78,7 +81,7 @@ public class AuthController {
             @Parameter(description = "Single-use cryptographic fraud token from the login alert email", required = true)
             @RequestParam("token") String token,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         return ResponseEntity.ok(authService.reportFraudAndLockAccount(token, ip));
     }
 
@@ -131,7 +134,7 @@ public class AuthController {
     public ResponseEntity<UserProfileDto> resetPasswordVerify(
             @Valid @RequestBody ResetPasswordVerifyRequest request,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         return ResponseEntity.ok(authService.verifyOtpAndResetPassword(request, ip));
     }
 }

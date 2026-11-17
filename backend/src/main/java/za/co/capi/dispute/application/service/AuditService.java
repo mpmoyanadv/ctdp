@@ -4,23 +4,21 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.capi.dispute.domain.model.AuditLog;
 import za.co.capi.dispute.domain.repository.AuditLogRepository;
 import za.co.capi.dispute.infrastructure.messaging.KafkaEventService;
+import za.co.capi.dispute.infrastructure.security.ClientIpResolver;
 import za.co.capi.dispute.presentation.dto.ApiDtos.AuditLogDto;
 import za.co.capi.dispute.presentation.dto.ApiDtos.PageResponseDto;
 
 import java.time.Instant;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -28,29 +26,28 @@ import java.util.UUID;
 @Service
 public class AuditService {
 
-    private static volatile List<IpAddressMatcher> configuredTrustedProxies = List.of();
-
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
     private final KafkaEventService kafkaEventService;
+    private final ClientIpResolver clientIpResolver;
 
     @Autowired
     public AuditService(
             AuditLogRepository auditLogRepository,
             ObjectMapper objectMapper,
             KafkaEventService kafkaEventService,
-            @Value("${app.security.trusted-proxies:}") List<String> trustedProxies) {
+            ClientIpResolver clientIpResolver) {
         this.auditLogRepository = auditLogRepository;
         this.objectMapper = objectMapper;
         this.kafkaEventService = kafkaEventService;
-        configuredTrustedProxies = compileProxyMatchers(trustedProxies);
+        this.clientIpResolver = clientIpResolver;
     }
 
     public AuditService(
             AuditLogRepository auditLogRepository,
             ObjectMapper objectMapper,
             KafkaEventService kafkaEventService) {
-        this(auditLogRepository, objectMapper, kafkaEventService, List.of());
+        this(auditLogRepository, objectMapper, kafkaEventService, new ClientIpResolver(List.of()));
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -141,62 +138,8 @@ public class AuditService {
         return sb.toString();
     }
 
-    public static String extractClientIp(HttpServletRequest request) {
-        return extractClientIpFromMatchers(request, configuredTrustedProxies);
-    }
-
-    public static String extractClientIp(HttpServletRequest request, Collection<String> trustedProxies) {
-        return extractClientIpFromMatchers(request, compileProxyMatchers(trustedProxies));
-    }
-
-    private static String extractClientIpFromMatchers(
-            HttpServletRequest request,
-            List<IpAddressMatcher> trustedProxyMatchers) {
-        if (request == null) {
-            return "127.0.0.1";
-        }
-        String remoteAddr = request.getRemoteAddr();
-        if (remoteAddr == null || remoteAddr.isBlank()) {
-            return "127.0.0.1";
-        }
-        if (isTrustedProxy(remoteAddr, trustedProxyMatchers)) {
-            String forwarded = request.getHeader("X-Forwarded-For");
-            if (forwarded != null && !forwarded.isBlank()) {
-                String first = forwarded.split(",")[0].trim();
-                if (!first.isBlank()) {
-                    return first;
-                }
-            }
-            String realIp = request.getHeader("X-Real-IP");
-            if (realIp != null && !realIp.isBlank()) {
-                return realIp.trim();
-            }
-        }
-        return remoteAddr;
-    }
-
-    private static List<IpAddressMatcher> compileProxyMatchers(Collection<String> trustedProxies) {
-        if (trustedProxies == null || trustedProxies.isEmpty()) {
-            return List.of();
-        }
-        return trustedProxies.stream()
-                .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .map(IpAddressMatcher::new)
-                .toList();
-    }
-
-    private static boolean isTrustedProxy(String remoteAddr, List<IpAddressMatcher> matchers) {
-        for (IpAddressMatcher matcher : matchers) {
-            try {
-                if (matcher.matches(remoteAddr)) {
-                    return true;
-                }
-            } catch (IllegalArgumentException ignored) {
-                // Ignore malformed remoteAddr (e.g. non-IP test stub) and treat as untrusted.
-            }
-        }
-        return false;
+    public String resolveClientIp(HttpServletRequest request) {
+        return clientIpResolver.resolveClientIp(request);
     }
 
     private String serializeMetadata(Map<String, Object> metadataMap) {

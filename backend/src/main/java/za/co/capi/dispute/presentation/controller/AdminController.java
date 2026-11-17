@@ -91,7 +91,7 @@ public class AdminController {
     public ResponseEntity<byte[]> exportAuditLogsCsv(
             @AuthenticationPrincipal AppUserPrincipal admin,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = auditService.resolveClientIp(servletRequest);
         auditService.logEvent(
                 admin.getId(),
                 admin.getEmail(),
@@ -127,7 +127,7 @@ public class AdminController {
             @PathVariable UUID id,
             @AuthenticationPrincipal AppUserPrincipal admin,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = auditService.resolveClientIp(servletRequest);
         return ResponseEntity.ok(authService.adminUnlockAccount(id, admin, ip));
     }
 
@@ -141,7 +141,7 @@ public class AdminController {
             @RequestBody AssignDisputeRequest request,
             @AuthenticationPrincipal AppUserPrincipal admin,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = auditService.resolveClientIp(servletRequest);
         return ResponseEntity.ok(disputeService.adminAssignDispute(id, request, admin, ip));
     }
 

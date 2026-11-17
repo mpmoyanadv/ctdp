@@ -11,10 +11,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import za.co.capi.dispute.application.service.AuditService;
 import za.co.capi.dispute.application.service.OmnichannelDisputeService;
 import za.co.capi.dispute.infrastructure.config.OpenApiConfig;
 import za.co.capi.dispute.infrastructure.security.AppUserPrincipal;
+import za.co.capi.dispute.infrastructure.security.ClientIpResolver;
 import za.co.capi.dispute.presentation.dto.ApiDtos.*;
 
 @RestController
@@ -24,9 +24,13 @@ import za.co.capi.dispute.presentation.dto.ApiDtos.*;
 public class OmnichannelController {
 
     private final OmnichannelDisputeService omnichannelService;
+    private final ClientIpResolver clientIpResolver;
 
-    public OmnichannelController(OmnichannelDisputeService omnichannelService) {
+    public OmnichannelController(
+            OmnichannelDisputeService omnichannelService,
+            ClientIpResolver clientIpResolver) {
         this.omnichannelService = omnichannelService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @Operation(
@@ -46,7 +50,7 @@ public class OmnichannelController {
             @Valid @RequestBody SmsWebhookSimulationRequest request,
             @AuthenticationPrincipal AppUserPrincipal principal,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(omnichannelService.simulateSmsOrWhatsapp(request, principal, ip));
     }
@@ -68,7 +72,7 @@ public class OmnichannelController {
             @Valid @RequestBody VoiceCallSimulationRequest request,
             @AuthenticationPrincipal AppUserPrincipal principal,
             HttpServletRequest servletRequest) {
-        String ip = AuditService.extractClientIp(servletRequest);
+        String ip = clientIpResolver.resolveClientIp(servletRequest);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(omnichannelService.simulateVoiceCall(request, principal, ip));
     }
