@@ -26,6 +26,7 @@ import za.co.capi.dispute.domain.model.PasswordResetOtp;
 import za.co.capi.dispute.domain.repository.AppUserRepository;
 import za.co.capi.dispute.domain.repository.FraudAlertTokenRepository;
 import za.co.capi.dispute.domain.repository.PasswordResetOtpRepository;
+import za.co.capi.dispute.infrastructure.cache.LoginRateLimiterService;
 import za.co.capi.dispute.infrastructure.cache.OtpRateLimiterService;
 
 import java.time.Instant;
@@ -73,6 +74,9 @@ class OtpSecurityTest {
     @Autowired
     private OtpRateLimiterService otpRateLimiterService;
 
+    @Autowired
+    private LoginRateLimiterService loginRateLimiterService;
+
     @MockBean
     private JavaMailSender javaMailSender;
 
@@ -83,6 +87,7 @@ class OtpSecurityTest {
         fraudAlertTokenRepository.deleteAll();
         passwordResetOtpRepository.deleteAll();
         otpRateLimiterService.clearLocalLimits();
+        loginRateLimiterService.clearLocalLimits();
 
         AppUser customer = appUserRepository.findByEmailIgnoreCase("customer@capi.test").orElseThrow();
         customer.setLocked(false);

@@ -13,6 +13,7 @@ import za.co.capi.dispute.domain.model.UserRole;
 import za.co.capi.dispute.domain.repository.AppUserRepository;
 import za.co.capi.dispute.domain.repository.FraudAlertTokenRepository;
 import za.co.capi.dispute.domain.repository.PasswordResetOtpRepository;
+import za.co.capi.dispute.infrastructure.cache.LoginRateLimiterService;
 import za.co.capi.dispute.infrastructure.cache.OtpRateLimiterService;
 import za.co.capi.dispute.infrastructure.security.AppUserPrincipal;
 import za.co.capi.dispute.infrastructure.security.JwtTokenProvider;
@@ -30,6 +31,7 @@ import java.util.UUID;
 public class AuthService {
 
     public static final int MAX_OTP_FAILED_ATTEMPTS = 5;
+    public static final String GENERIC_LOGIN_ERROR = "Invalid email or password.";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final AppUserRepository appUserRepository;
@@ -41,7 +43,9 @@ public class AuthService {
     private final AuditService auditService;
     private final PiiMaskingService piiMaskingService;
     private final OtpRateLimiterService otpRateLimiterService;
+    private final LoginRateLimiterService loginRateLimiterService;
     private final TransactionTemplate requiresNewTx;
+    private final String dummyPasswordHash;
 
     public AuthService(
             AppUserRepository appUserRepository,
@@ -53,6 +57,7 @@ public class AuthService {
             AuditService auditService,
             PiiMaskingService piiMaskingService,
             OtpRateLimiterService otpRateLimiterService,
+            LoginRateLimiterService loginRateLimiterService,
             PlatformTransactionManager transactionManager) {
         this.appUserRepository = appUserRepository;
         this.fraudAlertTokenRepository = fraudAlertTokenRepository;
@@ -63,16 +68,50 @@ public class AuthService {
         this.auditService = auditService;
         this.piiMaskingService = piiMaskingService;
         this.otpRateLimiterService = otpRateLimiterService;
+        this.loginRateLimiterService = loginRateLimiterService;
         this.requiresNewTx = new TransactionTemplate(transactionManager);
         this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.dummyPasswordHash = passwordEncoder.encode("CapiTimingEqualizerDummyPassword!2026");
     }
 
     @Transactional
     public AuthResponse login(LoginRequest request, String ipAddress) {
-        AppUser user = appUserRepository.findByEmailIgnoreCase(request.email().trim())
-                .orElseThrow(() -> ApiException.unauthorized("Invalid email or password."));
+        String normalizedEmail = request.email().trim();
+        if (loginRateLimiterService.isIpRateLimited(ipAddress)) {
+            auditService.logEvent(
+                    null,
+                    piiMaskingService.maskEmail(normalizedEmail),
+                    "WARN",
+                    "LOGIN_RATE_LIMITED_IP",
+                    "AppUser",
+                    "IP_RATE_LIMIT",
+                    ipAddress,
+                    Map.of("ipAddress", ipAddress != null ? ipAddress : "unknown")
+            );
+            throw ApiException.tooManyRequests("Too many failed login attempts from this IP address. Please wait before trying again.");
+        }
 
-        if (user.isLocked()) {
+        AppUser user = appUserRepository.findByEmailIgnoreCase(normalizedEmail).orElse(null);
+        String targetHash = user != null ? user.getPasswordHash() : dummyPasswordHash;
+        boolean passwordMatches = passwordEncoder.matches(request.password(), targetHash);
+
+        if (user == null) {
+            loginRateLimiterService.recordFailure(normalizedEmail, ipAddress);
+            auditService.logEvent(
+                    null,
+                    piiMaskingService.maskEmail(normalizedEmail),
+                    "WARN",
+                    "LOGIN_FAILED_UNKNOWN_USER",
+                    "AppUser",
+                    "UNKNOWN",
+                    ipAddress,
+                    Map.of()
+            );
+            throw ApiException.unauthorized(GENERIC_LOGIN_ERROR);
+        }
+
+        if (user.isLocked() || loginRateLimiterService.isAccountTemporarilyLocked(normalizedEmail)) {
+            loginRateLimiterService.recordIpFailureOnly(ipAddress);
             auditService.logEvent(
                     user.getId(),
                     user.getEmail(),
@@ -81,14 +120,13 @@ public class AuthService {
                     "AppUser",
                     user.getId().toString(),
                     ipAddress,
-                    Map.of("reason", user.getLockedReason() != null ? user.getLockedReason() : "Account locked")
+                    Map.of("reason", user.isLocked() && user.getLockedReason() != null ? user.getLockedReason() : "Account locked")
             );
-            throw ApiException.accountLocked(
-                    "Account Locked: Security lockdown is active on this profile. Please verify your 6-digit OTP code via Reset Password to restore access."
-            );
+            throw ApiException.unauthorized(GENERIC_LOGIN_ERROR);
         }
 
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        if (!passwordMatches) {
+            loginRateLimiterService.recordFailure(normalizedEmail, ipAddress);
             auditService.logEvent(
                     user.getId(),
                     user.getEmail(),
@@ -97,11 +135,12 @@ public class AuthService {
                     "AppUser",
                     user.getId().toString(),
                     ipAddress,
-                    Map.of("email", user.getEmail())
+                    Map.of()
             );
-            throw ApiException.unauthorized("Invalid email or password.");
+            throw ApiException.unauthorized(GENERIC_LOGIN_ERROR);
         }
 
+        loginRateLimiterService.resetAccountFailures(normalizedEmail);
         String jwt = jwtTokenProvider.generateToken(user);
 
         auditService.logEvent(
@@ -290,6 +329,7 @@ public class AuthService {
         user.setLockedReason(null);
         user.incrementTokenVersion();
         appUserRepository.save(user);
+        loginRateLimiterService.resetAccountFailures(user.getEmail());
 
         auditService.logEvent(
                 user.getId(),
@@ -313,6 +353,7 @@ public class AuthService {
         user.setLockedReason(null);
         user.incrementTokenVersion();
         appUserRepository.save(user);
+        loginRateLimiterService.resetAccountFailures(user.getEmail());
 
         auditService.logEvent(
                 admin.getId(),

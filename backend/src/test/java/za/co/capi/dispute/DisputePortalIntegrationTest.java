@@ -133,11 +133,12 @@ class DisputePortalIntegrationTest {
                         .header("Authorization", "Bearer " + customer1Token))
                 .andExpect(status().isUnauthorized());
 
-        // Login attempt while locked must fail with 423 Locked
+        // Login attempt while locked must return generic 401 Unauthorized to prevent account enumeration
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"customer@capi.test\",\"password\":\"Password123!\"}"))
-                .andExpect(status().isLocked());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid email or password."));
 
         // Unlock with OTP extracted from emailed notification (DB stores only hash)
         PasswordResetOtp otp = passwordResetOtpRepository.findAll().getFirst();

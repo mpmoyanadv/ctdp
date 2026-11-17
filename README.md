@@ -133,7 +133,8 @@ Coverage includes:
 - Full dispute lifecycle with multipart evidence uploads, magic-byte validation, and SHA-256 verification (`DisputePortalIntegrationTest`, `AttachmentSecurityTest`)
 - Redis idempotency lock rejection (`409 Conflict`) on duplicate submission and transaction ownership/settlement checks (`TransactionIntegrityTest`)
 - Cross-customer IDOR rejection (`403 Forbidden`), role/transition enforcement (`DisputeAuthorizationAndTransitionTest`), and `UNAUTHORIZED_ACCESS_ATTEMPT` audit logging
-- Fraud alert two-step confirmation lockdown (`423 Locked`), JWT session revocation, and cryptographic 6-digit OTP password reset (`FraudRecoveryConfirmationTest`, `OtpSecurityTest`)
+- Fraud alert two-step confirmation lockdown, JWT session revocation, and cryptographic 6-digit OTP password reset (`FraudRecoveryConfirmationTest`, `OtpSecurityTest`)
+- Login brute-force protection: 5-failure temporary account lockout, 20-failure/5-minute per-IP `429` throttling, failure counter reset on success, and uniform `401` responses (`LoginBruteForceAndLockoutTest`)
 - External affiliate PII masking (`PiiMaskingServiceTest`)
 - Fail-fast JWT secret validation, profile-gated demo seeding, and CORS/proxy trust (`JwtSecretValidationTest`, `DataSeederWithDemoProfileTest`, `DataSeederWithoutDemoProfileTest`, `CorsAndProxyTrustTest`)
 - Flyway schema migrations, pagination boundaries, stable sorting, CSV formula-injection sanitization, and Kafka telemetry (`FlywayMigrationAndConstraintTest`, `PaginationAndQueryOptimizationTest`, `AuditCsvSanitizationTest`, `KafkaEventServiceTest`)
@@ -226,4 +227,4 @@ Enforced centrally in `DisputeTransitionPolicy` and `DisputeService`:
 
 - **Schema migrations:** Flyway manages schema evolution (`src/main/resources/db/migration/common` and `postgresql`) with Hibernate `ddl-auto=validate`.
 - **Fail-fast production secrets & profile gating:** `DataSeeder` only runs under `demo` or `dev` profiles. Non-demo deployments require an explicit `APP_JWT_SECRET` (minimum 32 bytes) and fail fast on startup if missing or using the placeholder/default secret.
-- **Rate limiting & trusted proxies:** `AuthRateLimitFilter` enforces per-IP/account limits on `/api/v1/auth/login`, `/api/v1/auth/report-fraud`, and `/api/v1/auth/reset-password-verify`. Forwarded client IP headers are honored only from CIDRs configured in `APP_TRUSTED_PROXIES`.
+- **Rate limiting & trusted proxies:** `LoginRateLimiterService` enforces per-account lockout (5 consecutive failures) and per-IP `429` throttling (20 failures in 5 minutes) on `/api/v1/auth/login` with uniform `401` responses across unknown, locked, and bad-password cases; `OtpRateLimiterService` throttles OTP verification on `/api/v1/auth/reset-password-verify`. Forwarded client IP headers are honored only from CIDRs configured in `APP_TRUSTED_PROXIES`.
