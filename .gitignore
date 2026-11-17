@@ -31,3 +31,7 @@ uploads/
 .DS_Store
 Thumbs.db
 
+# Environment secrets
+.env
+!.env.example
+
