@@ -4,6 +4,7 @@ import { LoginComponent } from './features/auth/login.component';
 import { FraudReportComponent } from './features/auth/fraud-report.component';
 import { ResetPasswordVerifyComponent } from './features/auth/reset-password-verify.component';
 import { CustomerDashboardComponent } from './features/customer/customer-dashboard.component';
+import { CustomerDisputesComponent } from './features/customer/customer-disputes.component';
 import { StaffDashboardComponent } from './features/staff/staff-dashboard.component';
 import { AffiliateDashboardComponent } from './features/affiliate/affiliate-dashboard.component';
 import { AdminDashboardComponent } from './features/admin/admin-dashboard.component';
@@ -18,6 +19,11 @@ export const routes: Routes = [
   {
     path: 'customer',
     component: CustomerDashboardComponent,
+    canActivate: [roleGuard(['CUSTOMER'])]
+  },
+  {
+    path: 'customer/disputes',
+    component: CustomerDisputesComponent,
     canActivate: [roleGuard(['CUSTOMER'])]
   },
   {
@@ -43,7 +49,7 @@ export const routes: Routes = [
   {
     path: 'simulator',
     component: OmnichannelSimulatorComponent,
-    canActivate: [roleGuard(['CUSTOMER', 'STAFF', 'ADMIN'])]
+    canActivate: [roleGuard(['STAFF', 'ADMIN'])]
   },
   { path: '**', redirectTo: 'login' }
 ];

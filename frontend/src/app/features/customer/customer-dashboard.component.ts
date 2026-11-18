@@ -25,18 +25,20 @@ import {
           </p>
         </div>
         <div class="flex items-center gap-3">
-          <a routerLink="/simulator"
-             class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition whitespace-nowrap">
-            SMS / WhatsApp / Call Simulator
-          </a>
-          <div class="px-4 py-2 rounded-xl bg-blue-50 border border-blue-100 text-right">
+          <a id="active-disputes-link"
+             [routerLink]="['/customer/disputes']"
+             [queryParams]="{ filter: 'ACTIVE' }"
+             class="px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-right transition cursor-pointer">
             <div class="text-xs text-slate-500">Active Disputes</div>
-            <div class="text-lg font-bold text-capi-blue">{{ activeDisputesCount }}</div>
-          </div>
-          <div class="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-100 text-right">
+            <div class="text-lg font-bold text-capi-blue">{{ activeDisputesCount }} &rarr;</div>
+          </a>
+          <a id="historic-disputes-link"
+             [routerLink]="['/customer/disputes']"
+             [queryParams]="{ filter: 'HISTORIC' }"
+             class="px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-right transition cursor-pointer">
             <div class="text-xs text-slate-500">Historic / Closed</div>
-            <div class="text-lg font-bold text-emerald-700">{{ historicDisputesCount }}</div>
-          </div>
+            <div class="text-lg font-bold text-emerald-700">{{ historicDisputesCount }} &rarr;</div>
+          </a>
         </div>
       </div>
 
@@ -79,6 +81,37 @@ import {
           }
 
           <form (ngSubmit)="submitDispute()" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label for="dispute-transaction-type" class="block text-sm font-semibold text-slate-700 mb-1">Transaction Type</label>
+                <select
+                  id="dispute-transaction-type"
+                  name="selectedTxPaymentRail"
+                  [(ngModel)]="selectedTxPaymentRail"
+                  class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white focus:ring-2 focus:ring-capi-blue outline-none"
+                >
+                  <option value="CARD_POS">Card Payment (POS / Speedpoint)</option>
+                  <option value="ATM_WITHDRAWAL">ATM (Cash Withdrawal / Deposit)</option>
+                  <option value="EFT">EFT (Electronic Funds Transfer)</option>
+                  <option value="DEBIT_ORDER">Debit Order / DebiCheck</option>
+                  <option value="PAYSHAP">PayShap Instant Payment</option>
+                  <option value="ONLINE_ECOMMERCE">Online Card Payment (E-Commerce)</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="dispute-location" class="block text-sm font-semibold text-slate-700 mb-1">Location (Optional)</label>
+                <input
+                  id="dispute-location"
+                  type="text"
+                  name="selectedTxLocation"
+                  [(ngModel)]="selectedTxLocation"
+                  placeholder="e.g. Sandton City Mall, Gauteng (Optional)"
+                  class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-capi-blue outline-none"
+                />
+              </div>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label for="dispute-category" class="block text-sm font-semibold text-slate-700 mb-1">Dispute Category</label>
@@ -225,125 +258,16 @@ import {
           </table>
         </div>
       </section>
-
-      <!-- Customer's Logged & Historic Disputed Transactions -->
-      <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h2 class="text-lg font-bold text-slate-900">My Logged &amp; Historic Disputed Transactions</h2>
-            <p class="text-xs text-slate-500">Complete audit trail of active and closed transaction disputes, outcomes, and linked cases.</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              (click)="disputeFilter = 'ALL'"
-              [class]="disputeFilter === 'ALL'
-                ? 'px-3 py-1.5 rounded-lg bg-capi-blue text-white text-xs font-semibold'
-                : 'px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold'"
-            >
-              All ({{ disputes.length }})
-            </button>
-            <button
-              type="button"
-              (click)="disputeFilter = 'ACTIVE'"
-              [class]="disputeFilter === 'ACTIVE'
-                ? 'px-3 py-1.5 rounded-lg bg-capi-blue text-white text-xs font-semibold'
-                : 'px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold'"
-            >
-              Active ({{ activeDisputesCount }})
-            </button>
-            <button
-              type="button"
-              (click)="disputeFilter = 'HISTORIC'"
-              [class]="disputeFilter === 'HISTORIC'
-                ? 'px-3 py-1.5 rounded-lg bg-capi-blue text-white text-xs font-semibold'
-                : 'px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold'"
-            >
-              Historic / Closed ({{ historicDisputesCount }})
-            </button>
-            <button type="button" (click)="loadData()" class="ml-2 text-xs text-capi-blue font-semibold hover:underline">
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        @if (filteredDisputes.length === 0) {
-          <div class="p-8 text-center text-sm text-slate-500">No disputed transactions match the selected filter.</div>
-        } @else {
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left">
-              <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
-                <tr>
-                  <th class="px-6 py-3">Dispute Ref</th>
-                  <th class="px-6 py-3">Merchant &amp; Rail</th>
-                  <th class="px-6 py-3">Category &amp; Outcome</th>
-                  <th class="px-6 py-3">Amount</th>
-                  <th class="px-6 py-3">Status</th>
-                  <th class="px-6 py-3">Logged / Resolved</th>
-                  <th class="px-6 py-3">Evidence</th>
-                  <th class="px-6 py-3 text-right">Details</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100">
-                @for (d of filteredDisputes; track d.id) {
-                  <tr class="hover:bg-slate-50/80 transition">
-                    <td class="px-6 py-4">
-                      <div class="font-mono font-bold text-slate-900">{{ d.disputeReference }}</div>
-                      @if (d.originalDisputeReference) {
-                        <div class="text-xs text-indigo-700 font-medium mt-0.5">
-                          Linked to {{ d.originalDisputeReference }}
-                        </div>
-                      }
-                    </td>
-                    <td class="px-6 py-4">
-                      <div class="font-medium text-slate-800">{{ d.merchantName }}</div>
-                      <div class="text-xs text-slate-500">{{ d.paymentRail }} &bull; {{ d.sourceChannel || 'WEB_PORTAL' }}</div>
-                    </td>
-                    <td class="px-6 py-4">
-                      <div class="text-xs font-semibold text-slate-700">{{ d.category }}</div>
-                      @if (d.resolutionSummary) {
-                        <div class="text-xs text-slate-500 mt-0.5 max-w-xs truncate" [title]="d.resolutionSummary">
-                          Outcome: {{ d.resolutionSummary }}
-                        </div>
-                      } @else {
-                        <div class="text-xs text-slate-400 mt-0.5 max-w-xs truncate" [title]="d.reason">
-                          {{ d.reason }}
-                        </div>
-                      }
-                    </td>
-                    <td class="px-6 py-4 font-semibold text-slate-900">R {{ d.amount | number:'1.2-2' }}</td>
-                    <td class="px-6 py-4">
-                      <span [class]="statusBadgeClass(d.status)">{{ d.status }}</span>
-                    </td>
-                    <td class="px-6 py-4 text-xs text-slate-500">
-                      <div>Logged: {{ d.createdAt | date:'shortDate' }}</div>
-                      @if (d.resolvedAt) {
-                        <div class="text-emerald-700 font-medium">Closed: {{ d.resolvedAt | date:'shortDate' }}</div>
-                      }
-                    </td>
-                    <td class="px-6 py-4 text-xs text-slate-600">{{ d.attachmentCount }} file(s)</td>
-                    <td class="px-6 py-4 text-right">
-                      <a [routerLink]="['/disputes', d.id]"
-                         class="px-3.5 py-1.5 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition inline-block">
-                        View Case
-                      </a>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        }
-      </section>
     </div>
   `
 })
 export class CustomerDashboardComponent implements OnInit {
   transactions: BankTransaction[] = [];
   disputes: DisputeSummary[] = [];
-  disputeFilter: 'ALL' | 'ACTIVE' | 'HISTORIC' = 'ALL';
 
   selectedTx: BankTransaction | null = null;
+  selectedTxPaymentRail = 'CARD_POS';
+  selectedTxLocation = '';
   category: DisputeCategory = 'UNAUTHORIZED_TRANSACTION';
   reason = '';
   selectedFiles: File[] = [];
@@ -361,16 +285,6 @@ export class CustomerDashboardComponent implements OnInit {
     return this.disputes.filter((d) => d.terminal).length;
   }
 
-  get filteredDisputes(): DisputeSummary[] {
-    if (this.disputeFilter === 'ACTIVE') {
-      return this.disputes.filter((d) => !d.terminal);
-    }
-    if (this.disputeFilter === 'HISTORIC') {
-      return this.disputes.filter((d) => d.terminal);
-    }
-    return this.disputes;
-  }
-
   getLatestDisputeForTransaction(transactionId: string): DisputeSummary | undefined {
     return this.disputes.find((d) => d.transactionId === transactionId);
   }
@@ -386,6 +300,8 @@ export class CustomerDashboardComponent implements OnInit {
 
   openLogDispute(tx: BankTransaction): void {
     this.selectedTx = tx;
+    this.selectedTxPaymentRail = tx.paymentRail;
+    this.selectedTxLocation = tx.location || '';
     this.category = tx.paymentRail === 'PAYSHAP' ? 'PAYSHAP_WRONG_RECIPIENT' : 'UNAUTHORIZED_TRANSACTION';
     this.reason = `Unauthorized ${tx.merchantName} transaction of R${tx.amount.toFixed(2)} not initiated by me.`;
     this.selectedFiles = [];
@@ -394,6 +310,7 @@ export class CustomerDashboardComponent implements OnInit {
 
   cancelDisputeForm(): void {
     this.selectedTx = null;
+    this.selectedTxLocation = '';
     this.selectedFiles = [];
     this.formError = '';
   }
@@ -420,13 +337,19 @@ export class CustomerDashboardComponent implements OnInit {
     this.submitting = true;
     this.formError = '';
 
+    const trimmedLoc = this.selectedTxLocation.trim();
+    const formattedReason =
+      trimmedLoc && trimmedLoc !== (this.selectedTx.location || '').trim()
+        ? `${this.reason.trim()} [Location: ${trimmedLoc}]`
+        : this.reason.trim();
+
     const fd = new FormData();
     fd.append('transactionId', this.selectedTx.id);
     fd.append('merchantName', this.selectedTx.merchantName);
-    fd.append('paymentRail', this.selectedTx.paymentRail);
+    fd.append('paymentRail', this.selectedTxPaymentRail || this.selectedTx.paymentRail);
     fd.append('category', this.category);
     fd.append('amount', String(this.selectedTx.amount));
-    fd.append('reason', this.reason.trim());
+    fd.append('reason', formattedReason);
     this.selectedFiles.forEach((f) => fd.append('files', f, f.name));
 
     this.api.createDisputeMultipart(fd).subscribe({

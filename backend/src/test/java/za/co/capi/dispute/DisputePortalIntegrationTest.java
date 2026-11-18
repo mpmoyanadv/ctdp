@@ -42,6 +42,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -87,6 +88,12 @@ class DisputePortalIntegrationTest {
         customer.setLockedReason(null);
         customer.setPasswordHash(passwordEncoder.encode("Password123!"));
         appUserRepository.save(customer);
+
+        AppUser customer2 = appUserRepository.findByEmailIgnoreCase("customer2@capi.test").orElseThrow();
+        customer2.setLocked(false);
+        customer2.setLockedReason(null);
+        customer2.setPasswordHash(passwordEncoder.encode("Password123!"));
+        appUserRepository.save(customer2);
     }
 
     @Test
@@ -243,6 +250,21 @@ class DisputePortalIntegrationTest {
         }
         assertThat(payshapId).isNotNull();
 
+        // Unassigned PayShap dispute cannot be delegated by staff until Admin assigns it
+        mockMvc.perform(post("/api/v1/disputes/" + payshapId + "/delegate")
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"partnerDomain\":\"PARTNER_BANKSERV\",\"note\":\"Verify interbank PayShap settlement\"}"))
+                .andExpect(status().isForbidden());
+
+        AppUser staffUser = appUserRepository.findByEmailIgnoreCase("staff@capi.test").orElseThrow();
+        mockMvc.perform(post("/api/v1/admin/disputes/" + payshapId + "/assign")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"assigneeUserId\":\"" + staffUser.getId() + "\",\"assignedDomain\":\"INTERNAL_CAPI\",\"status\":\"IN_REVIEW\",\"note\":\"Assigned to Sipho\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignedUserName").value("Sipho Ndlovu"));
+
         mockMvc.perform(post("/api/v1/disputes/" + payshapId + "/delegate")
                         .header("Authorization", "Bearer " + staffToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -340,18 +362,27 @@ class DisputePortalIntegrationTest {
                 }
                 """;
 
+        // Customers cannot invoke staff-only omnichannel simulation endpoints
         mockMvc.perform(post("/api/v1/omnichannel/sms-webhook")
                         .header("Authorization", "Bearer " + customer1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(smsPayload))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/omnichannel/sms-webhook")
+                        .header("Authorization", "Bearer " + staffToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(smsPayload))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.channel").value("SMS"))
                 .andExpect(jsonPath("$.dispute.sourceChannel").value("SMS"))
+                .andExpect(jsonPath("$.dispute.status").value("IN_REVIEW"))
+                .andExpect(jsonPath("$.dispute.assignedUserName").value("Sipho Ndlovu"))
                 .andExpect(jsonPath("$.dispute.category").value("ATM_DISPENSE_ERROR"))
                 .andExpect(jsonPath("$.outboundReply").value(org.hamcrest.Matchers.containsString("SMS Auto-Reply")));
 
         mockMvc.perform(post("/api/v1/omnichannel/sms-webhook")
-                        .header("Authorization", "Bearer " + customer1Token)
+                        .header("Authorization", "Bearer " + staffToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(smsPayload))
                 .andExpect(status().isConflict());
@@ -374,7 +405,150 @@ class DisputePortalIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.channel").value("PHONE_CALL"))
                 .andExpect(jsonPath("$.dispute.sourceChannel").value("PHONE_CALL"))
+                .andExpect(jsonPath("$.dispute.status").value("IN_REVIEW"))
+                .andExpect(jsonPath("$.dispute.assignedUserName").value("Sipho Ndlovu"))
                 .andExpect(jsonPath("$.dispute.notes[0].message").value(org.hamcrest.Matchers.containsString("VOICE CALL RECORDING")));
+    }
+
+    @Test
+    void listsUsersAndAllowsAdminToUnlockLockedUserAccount() throws Exception {
+        String customer1Token = loginAndExtractToken("customer@capi.test", "Password123!");
+        String adminToken = loginAndExtractToken("admin@capi.test", "Password123!");
+        AppUser customer2 = appUserRepository.findByEmailIgnoreCase("customer2@capi.test").orElseThrow();
+
+        // Non-admin users cannot access admin user directory
+        mockMvc.perform(get("/api/v1/admin/users")
+                        .header("Authorization", "Bearer " + customer1Token))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/v1/admin/users")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(5)));
+
+        // Lock customer2 via 5 consecutive failed login attempts and flag the account locked
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(post("/api/v1/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"customer2@capi.test\",\"password\":\"WrongPass!\"}"))
+                    .andExpect(status().isUnauthorized());
+        }
+        customer2.setLocked(true);
+        customer2.setLockedReason("Locked during admin unlock test");
+        appUserRepository.save(customer2);
+
+        // Even with the valid password, locked/throttled login must fail
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"customer2@capi.test\",\"password\":\"Password123!\"}"))
+                .andExpect(status().isUnauthorized());
+
+        // Admin unlocks customer2 (clears both DB lock and Redis/local brute-force counter)
+        mockMvc.perform(post("/api/v1/admin/users/" + customer2.getId() + "/unlock")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("customer2@capi.test"))
+                .andExpect(jsonPath("$.isLocked").value(false));
+
+        // Login succeeds again after unlock and audit record is persisted
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"customer2@capi.test\",\"password\":\"Password123!\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty());
+
+        assertThat(auditLogRepository.findAllByOrderByTimestampDesc().stream()
+                .map(AuditLog::getEventType))
+                .contains("ADMIN_UNLOCKED_USER_ACCOUNT");
+
+        // Admin role catalog + create/update role + create/update staff user + productivity integration
+        mockMvc.perform(get("/api/v1/admin/roles")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(6)));
+
+        mockMvc.perform(post("/api/v1/admin/roles")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "roleCode": "CHARGEBACK_LEAD",
+                                  "displayName": "Chargeback Team Lead",
+                                  "baseRole": "STAFF",
+                                  "defaultDomain": "INTERNAL_CAPI",
+                                  "description": "Leads chargeback escalations."
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.roleCode").value("CHARGEBACK_LEAD"))
+                .andExpect(jsonPath("$.displayName").value("Chargeback Team Lead"));
+
+        mockMvc.perform(put("/api/v1/admin/roles/CHARGEBACK_LEAD")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Senior Chargeback Lead",
+                                  "baseRole": "STAFF",
+                                  "defaultDomain": "INTERNAL_CAPI",
+                                  "description": "Leads high-value chargeback escalations."
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Senior Chargeback Lead"));
+
+        MvcResult createdStaffRes = mockMvc.perform(post("/api/v1/admin/users")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fullName": "Kagiso Molefe",
+                                  "email": "kagiso.molefe@capi.test",
+                                  "phoneNumber": "+27219411055",
+                                  "role": "STAFF",
+                                  "userDomain": "INTERNAL_CAPI",
+                                  "partnerInstitution": "Chargeback Specialist"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value("kagiso.molefe@capi.test"))
+                .andExpect(jsonPath("$.role").value("STAFF"))
+                .andExpect(jsonPath("$.partnerInstitution").value("Chargeback Specialist"))
+                .andReturn();
+        String newStaffId = objectMapper.readTree(createdStaffRes.getResponse().getContentAsString()).get("id").asText();
+
+        mockMvc.perform(put("/api/v1/admin/users/" + newStaffId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fullName": "Kagiso Molefe-Ndlovu",
+                                  "email": "kagiso.molefe@capi.test",
+                                  "phoneNumber": "+27219411056",
+                                  "role": "ADMIN",
+                                  "userDomain": "INTERNAL_CAPI",
+                                  "partnerInstitution": "Senior Chargeback Lead",
+                                  "isLocked": false
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("Kagiso Molefe-Ndlovu"))
+                .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.partnerInstitution").value("Senior Chargeback Lead"));
+
+        MvcResult prodRes = mockMvc.perform(get("/api/v1/admin/reports/productivity")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recentSessions[0].assignmentSource").isNotEmpty())
+                .andExpect(jsonPath("$.recentSessions[0].sessionOutcome").isNotEmpty())
+                .andReturn();
+        assertThat(prodRes.getResponse().getContentAsString())
+                .contains("kagiso.molefe@capi.test")
+                .contains("Senior Chargeback Lead");
+
+        assertThat(auditLogRepository.findAllByOrderByTimestampDesc().stream()
+                .map(AuditLog::getEventType))
+                .contains("ADMIN_ROLE_CREATED", "ADMIN_ROLE_UPDATED", "ADMIN_STAFF_USER_CREATED", "ADMIN_STAFF_USER_UPDATED");
     }
 
     private String loginAndExtractToken(String email, String password) throws Exception {

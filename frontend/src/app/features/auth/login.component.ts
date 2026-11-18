@@ -36,7 +36,10 @@ import { AuthService } from '../../core/services/auth.service';
                 Customer 2: customer2&#64;capi.test
               </button>
               <button type="button" (click)="quickFill('staff@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
-                Internal Staff: staff&#64;capi.test
+                Internal Staff 1: staff&#64;capi.test
+              </button>
+              <button type="button" (click)="quickFill('staff2@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
+                Internal Staff 2: staff2&#64;capi.test
               </button>
               <button type="button" (click)="quickFill('affiliate@bankserv.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
                 Bankserv Affiliate: affiliate&#64;bankserv.test

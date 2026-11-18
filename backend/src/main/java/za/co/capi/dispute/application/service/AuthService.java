@@ -9,6 +9,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import za.co.capi.dispute.domain.model.AppUser;
 import za.co.capi.dispute.domain.model.FraudAlertToken;
 import za.co.capi.dispute.domain.model.PasswordResetOtp;
+import za.co.capi.dispute.domain.model.UserDomain;
 import za.co.capi.dispute.domain.model.UserRole;
 import za.co.capi.dispute.domain.repository.AppUserRepository;
 import za.co.capi.dispute.domain.repository.FraudAlertTokenRepository;
@@ -23,6 +24,9 @@ import za.co.capi.dispute.presentation.exception.ApiException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -46,6 +50,7 @@ public class AuthService {
     private final LoginRateLimiterService loginRateLimiterService;
     private final TransactionTemplate requiresNewTx;
     private final String dummyPasswordHash;
+    private final Map<String, StaffRoleDefinitionDto> roleCatalog = Collections.synchronizedMap(new LinkedHashMap<>());
 
     public AuthService(
             AppUserRepository appUserRepository,
@@ -72,6 +77,56 @@ public class AuthService {
         this.requiresNewTx = new TransactionTemplate(transactionManager);
         this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.dummyPasswordHash = passwordEncoder.encode("CapiTimingEqualizerDummyPassword!2026");
+        initDefaultRoles();
+    }
+
+    private void initDefaultRoles() {
+        registerDefaultRole(new StaffRoleDefinitionDto(
+                "DISPUTE_INVESTIGATOR",
+                "Dispute Investigator",
+                UserRole.STAFF,
+                UserDomain.INTERNAL_CAPI,
+                "Investigates Supervisor-assigned disputes, attaches evidence, and resolves or escalates cases."
+        ));
+        registerDefaultRole(new StaffRoleDefinitionDto(
+                "CALL_CENTRE_AGENT",
+                "Call Centre KYC & Intake Agent",
+                UserRole.STAFF,
+                UserDomain.INTERNAL_CAPI,
+                "Verifies calling customers via SA ID / Foreign Passport & credit-bureau checks and logs auto-assigned phone disputes."
+        ));
+        registerDefaultRole(new StaffRoleDefinitionDto(
+                "FRAUD_SPECIALIST",
+                "Senior Fraud & Chargeback Specialist",
+                UserRole.STAFF,
+                UserDomain.INTERNAL_CAPI,
+                "Handles high-risk card fraud, ATM dispense errors, and cross-border remittance disputes."
+        ));
+        registerDefaultRole(new StaffRoleDefinitionDto(
+                "SUPERVISOR_ADMIN",
+                "Supervisor / System Administrator",
+                UserRole.ADMIN,
+                UserDomain.INTERNAL_CAPI,
+                "Assigns and reassigns disputes, manages staff and roles, exports immutable audit CSVs, and reviews productivity."
+        ));
+        registerDefaultRole(new StaffRoleDefinitionDto(
+                "PARTNER_BANKSERV_INVESTIGATOR",
+                "BankservAfrica Clearing Investigator",
+                UserRole.AFFILIATE,
+                UserDomain.PARTNER_BANKSERV,
+                "External clearing partner investigator for delegated PayShap and interbank rails (POPIA PII-masked)."
+        ));
+        registerDefaultRole(new StaffRoleDefinitionDto(
+                "PARTNER_MERCHANT_INVESTIGATOR",
+                "Merchant Acquirer Investigator",
+                UserRole.AFFILIATE,
+                UserDomain.PARTNER_MERCHANT,
+                "External merchant acquirer investigator for POS and e-commerce chargeback disputes (POPIA PII-masked)."
+        ));
+    }
+
+    private void registerDefaultRole(StaffRoleDefinitionDto roleDef) {
+        roleCatalog.put(roleDef.roleCode(), roleDef);
     }
 
     @Transactional
@@ -376,6 +431,288 @@ public class AuthService {
                 .toList();
     }
 
+    public List<StaffRoleDefinitionDto> listStaffRoles() {
+        synchronized (roleCatalog) {
+            return new ArrayList<>(roleCatalog.values());
+        }
+    }
+
+    public StaffRoleDefinitionDto createStaffRole(
+            UpsertStaffRoleRequest request,
+            AppUserPrincipal admin,
+            String ipAddress) {
+        validateRoleDomainCompatibility(request.baseRole(), request.defaultDomain(), true);
+
+        String displayName = request.displayName().trim();
+        String derivedCode = normalizeRoleCode(
+                request.roleCode() != null && !request.roleCode().isBlank()
+                        ? request.roleCode()
+                        : displayName
+        );
+        if (roleCatalog.containsKey(derivedCode)) {
+            throw ApiException.conflict("Role code " + derivedCode + " already exists.");
+        }
+
+        String description = request.description() != null && !request.description().isBlank()
+                ? request.description().trim()
+                : displayName + " role in " + request.defaultDomain().name() + ".";
+        StaffRoleDefinitionDto created = new StaffRoleDefinitionDto(
+                derivedCode,
+                displayName,
+                request.baseRole(),
+                request.defaultDomain(),
+                description
+        );
+        roleCatalog.put(derivedCode, created);
+
+        auditService.logEvent(
+                admin.getId(),
+                admin.getEmail(),
+                "INFO",
+                "ADMIN_ROLE_CREATED",
+                "StaffRole",
+                derivedCode,
+                ipAddress,
+                Map.of(
+                        "roleCode", derivedCode,
+                        "displayName", displayName,
+                        "baseRole", request.baseRole().name(),
+                        "defaultDomain", request.defaultDomain().name()
+                )
+        );
+        return created;
+    }
+
+    @Transactional
+    public StaffRoleDefinitionDto updateStaffRole(
+            String roleCode,
+            UpsertStaffRoleRequest request,
+            AppUserPrincipal admin,
+            String ipAddress) {
+        validateRoleDomainCompatibility(request.baseRole(), request.defaultDomain(), true);
+
+        String normalizedCode = normalizeRoleCode(roleCode);
+        StaffRoleDefinitionDto previous = roleCatalog.get(normalizedCode);
+        String displayName = request.displayName().trim();
+        String description = request.description() != null && !request.description().isBlank()
+                ? request.description().trim()
+                : (previous != null ? previous.description() : displayName + " role.");
+
+        StaffRoleDefinitionDto updated = new StaffRoleDefinitionDto(
+                normalizedCode,
+                displayName,
+                request.baseRole(),
+                request.defaultDomain(),
+                description
+        );
+        roleCatalog.put(normalizedCode, updated);
+
+        if (previous != null && !previous.displayName().equalsIgnoreCase(displayName)) {
+            List<AppUser> matchedUsers = appUserRepository.findAll().stream()
+                    .filter(u -> u.getPartnerInstitution() != null
+                            && u.getPartnerInstitution().trim().equalsIgnoreCase(previous.displayName()))
+                    .toList();
+            for (AppUser matched : matchedUsers) {
+                matched.setPartnerInstitution(displayName);
+                appUserRepository.save(matched);
+            }
+        }
+
+        auditService.logEvent(
+                admin.getId(),
+                admin.getEmail(),
+                "INFO",
+                "ADMIN_ROLE_UPDATED",
+                "StaffRole",
+                normalizedCode,
+                ipAddress,
+                Map.of(
+                        "roleCode", normalizedCode,
+                        "displayName", displayName,
+                        "baseRole", request.baseRole().name(),
+                        "defaultDomain", request.defaultDomain().name()
+                )
+        );
+        return updated;
+    }
+
+    @Transactional
+    public UserProfileDto adminCreateUser(
+            CreateStaffUserRequest request,
+            AppUserPrincipal admin,
+            String ipAddress) {
+        String email = request.email().trim();
+        if (appUserRepository.findByEmailIgnoreCase(email).isPresent()) {
+            throw ApiException.conflict("A user with email " + email + " already exists.");
+        }
+        validateRoleDomainCompatibility(request.role(), request.userDomain(), false);
+
+        String rawPassword;
+        if (request.password() != null && !request.password().isBlank()) {
+            rawPassword = request.password().trim();
+            if (rawPassword.length() < 8) {
+                throw ApiException.badRequest("Password must be at least 8 characters.");
+            }
+        } else {
+            rawPassword = "Password123!";
+        }
+
+        AppUser user = new AppUser();
+        user.setFullName(request.fullName().trim());
+        user.setEmail(email);
+        user.setPhoneNumber(blankToNull(request.phoneNumber()));
+        user.setRole(request.role());
+        user.setUserDomain(request.userDomain());
+        user.setPartnerInstitution(resolveRoleTitle(request.partnerInstitution(), request.role(), request.userDomain()));
+        user.setPasswordHash(passwordEncoder.encode(rawPassword));
+        user.setLocked(false);
+
+        AppUser saved = appUserRepository.save(user);
+
+        auditService.logEvent(
+                admin.getId(),
+                admin.getEmail(),
+                "INFO",
+                "ADMIN_STAFF_USER_CREATED",
+                "AppUser",
+                saved.getId().toString(),
+                ipAddress,
+                Map.of(
+                        "createdEmail", saved.getEmail(),
+                        "fullName", saved.getFullName(),
+                        "role", saved.getRole().name(),
+                        "userDomain", saved.getUserDomain().name(),
+                        "roleTitle", saved.getPartnerInstitution() != null ? saved.getPartnerInstitution() : ""
+                )
+        );
+
+        return toUserProfile(saved);
+    }
+
+    @Transactional
+    public UserProfileDto adminUpdateUser(
+            UUID userId,
+            UpdateStaffUserRequest request,
+            AppUserPrincipal admin,
+            String ipAddress) {
+        AppUser user = appUserRepository.findById(userId)
+                .orElseThrow(() -> ApiException.notFound("User not found."));
+
+        String oldEmail = user.getEmail();
+        String newEmail = request.email().trim();
+        if (!oldEmail.equalsIgnoreCase(newEmail) && appUserRepository.findByEmailIgnoreCase(newEmail).isPresent()) {
+            throw ApiException.conflict("A user with email " + newEmail + " already exists.");
+        }
+
+        validateRoleDomainCompatibility(request.role(), request.userDomain(), false);
+
+        boolean securityContextChanged = user.getRole() != request.role()
+                || user.getUserDomain() != request.userDomain();
+
+        user.setFullName(request.fullName().trim());
+        user.setEmail(newEmail);
+        user.setPhoneNumber(blankToNull(request.phoneNumber()));
+        user.setRole(request.role());
+        user.setUserDomain(request.userDomain());
+        user.setPartnerInstitution(resolveRoleTitle(request.partnerInstitution(), request.role(), request.userDomain()));
+
+        if (request.isLocked() != null) {
+            boolean nextLocked = request.isLocked();
+            if (user.isLocked() != nextLocked) {
+                securityContextChanged = true;
+            }
+            user.setLocked(nextLocked);
+            if (nextLocked) {
+                String reason = blankToNull(request.lockedReason());
+                user.setLockedReason(reason != null ? reason : "Administratively locked by Supervisor");
+            } else {
+                user.setLockedReason(null);
+                loginRateLimiterService.resetAccountFailures(oldEmail);
+                loginRateLimiterService.resetAccountFailures(newEmail);
+            }
+        }
+
+        if (request.newPassword() != null && !request.newPassword().isBlank()) {
+            String trimmedPassword = request.newPassword().trim();
+            if (trimmedPassword.length() < 8) {
+                throw ApiException.badRequest("Password must be at least 8 characters.");
+            }
+            user.setPasswordHash(passwordEncoder.encode(trimmedPassword));
+            securityContextChanged = true;
+        }
+
+        if (securityContextChanged) {
+            user.incrementTokenVersion();
+        }
+
+        AppUser saved = appUserRepository.save(user);
+
+        auditService.logEvent(
+                admin.getId(),
+                admin.getEmail(),
+                "INFO",
+                "ADMIN_STAFF_USER_UPDATED",
+                "AppUser",
+                saved.getId().toString(),
+                ipAddress,
+                Map.of(
+                        "updatedEmail", saved.getEmail(),
+                        "fullName", saved.getFullName(),
+                        "role", saved.getRole().name(),
+                        "userDomain", saved.getUserDomain().name(),
+                        "roleTitle", saved.getPartnerInstitution() != null ? saved.getPartnerInstitution() : "",
+                        "isLocked", saved.isLocked()
+                )
+        );
+
+        return toUserProfile(saved);
+    }
+
+    private void validateRoleDomainCompatibility(UserRole role, UserDomain domain, boolean staffRoleOnly) {
+        if (role == null || domain == null) {
+            throw ApiException.badRequest("Role and domain are required.");
+        }
+        if (staffRoleOnly && (role == UserRole.CUSTOMER || domain == UserDomain.CUSTOMER)) {
+            throw ApiException.badRequest("Staff and partner role definitions cannot use CUSTOMER role or domain.");
+        }
+        if ((role == UserRole.STAFF || role == UserRole.ADMIN) && domain != UserDomain.INTERNAL_CAPI) {
+            throw ApiException.badRequest(role.name() + " users and roles must belong to the INTERNAL_CAPI domain.");
+        }
+        if (role == UserRole.AFFILIATE && domain != UserDomain.PARTNER_BANKSERV && domain != UserDomain.PARTNER_MERCHANT) {
+            throw ApiException.badRequest("AFFILIATE users and roles must belong to PARTNER_BANKSERV or PARTNER_MERCHANT.");
+        }
+        if (role == UserRole.CUSTOMER && domain != UserDomain.CUSTOMER) {
+            throw ApiException.badRequest("CUSTOMER accounts must belong to the CUSTOMER domain.");
+        }
+    }
+
+    private String resolveRoleTitle(String requestedTitle, UserRole role, UserDomain domain) {
+        String trimmed = blankToNull(requestedTitle);
+        if (trimmed != null) {
+            return trimmed;
+        }
+        return switch (role) {
+            case STAFF -> "Dispute Investigator";
+            case ADMIN -> "Supervisor / System Administrator";
+            case AFFILIATE -> domain == UserDomain.PARTNER_BANKSERV ? "BankservAfrica" : "Merchant Acquirer";
+            case CUSTOMER -> null;
+        };
+    }
+
+    private String normalizeRoleCode(String rawCode) {
+        String normalized = rawCode == null
+                ? ""
+                : rawCode.trim().toUpperCase().replaceAll("[^A-Z0-9]+", "_").replaceAll("^_+|_+$", "");
+        if (normalized.isBlank()) {
+            throw ApiException.badRequest("Role code / display name must contain alphanumeric characters.");
+        }
+        return normalized;
+    }
+
+    private String blankToNull(String value) {
+        return (value == null || value.isBlank()) ? null : value.trim();
+    }
+
     public UserProfileDto toUserProfile(AppUser user) {
         return new UserProfileDto(
                 user.getId(),
@@ -385,7 +722,8 @@ public class AuthService {
                 user.getUserDomain(),
                 user.getPartnerInstitution(),
                 user.isLocked(),
-                user.getLockedReason()
+                user.getLockedReason(),
+                user.getPhoneNumber()
         );
     }
 }

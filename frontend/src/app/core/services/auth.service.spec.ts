@@ -101,5 +101,36 @@ describe('AuthService', () => {
     expect(service.getHomeRouteForRole('ADMIN')).toBe('/admin');
     expect(service.getHomeRouteForRole(undefined)).toBe('/login');
   });
+
+  it('requests previewFraudReport with URL-encoded token', () => {
+    service.previewFraudReport('tok+1/2').subscribe((res) => {
+      expect(res.valid).toBeTrue();
+      expect(res.maskedEmail).toBe('cu****@capi.test');
+    });
+
+    const req = httpMock.expectOne('/api/v1/auth/report-fraud/preview?token=tok%2B1%2F2');
+    expect(req.request.method).toBe('GET');
+    req.flush({
+      valid: true,
+      maskedEmail: 'cu****@capi.test',
+      message: 'Confirm lockdown'
+    });
+  });
+
+  it('submits resetPasswordVerify payload to OTP verification endpoint', () => {
+    service.resetPasswordVerify('customer@capi.test', '123456', 'NewSecret!123').subscribe((profile) => {
+      expect(profile.email).toBe('customer@capi.test');
+      expect(profile.isLocked).toBeFalse();
+    });
+
+    const req = httpMock.expectOne('/api/v1/auth/reset-password-verify');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({
+      email: 'customer@capi.test',
+      otpCode: '123456',
+      newPassword: 'NewSecret!123'
+    });
+    req.flush(mockCustomer);
+  });
 });
 

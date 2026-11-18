@@ -7,7 +7,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -59,7 +61,7 @@ public class AdminController {
     @Operation(
             summary = "Retrieve Staff Productivity & Turnaround Time Report",
             description = """
-                    Calculates investigator turnaround metrics from `StaffWorkSession` timers (started when a dispute is claimed into `IN_REVIEW` and completed when resolved, rejected, escalated, or delegated externally).
+                    Calculates investigator turnaround metrics and live caseloads from `StaffWorkSession` timers (started on Supervisor assignment/reassignment or Call Centre intake auto-assignment into `IN_REVIEW` and completed on resolution, refund, rejection, escalation, external partner delegation, or reassignment).
                     """
     )
     @GetMapping("/reports/productivity")
@@ -116,6 +118,71 @@ public class AdminController {
     @GetMapping("/users")
     public ResponseEntity<List<UserProfileDto>> listUsers() {
         return ResponseEntity.ok(authService.listAllUsers());
+    }
+
+    @Operation(
+            summary = "Create a new staff member, supervisor/admin, or external partner user account",
+            description = "Provisions a new portal account with role, institutional domain, optional role title/institution, and credentials, and records `ADMIN_STAFF_USER_CREATED` in the immutable audit log."
+    )
+    @PostMapping("/users")
+    public ResponseEntity<UserProfileDto> createUser(
+            @Valid @RequestBody CreateStaffUserRequest request,
+            @AuthenticationPrincipal AppUserPrincipal admin,
+            HttpServletRequest servletRequest) {
+        String ip = auditService.resolveClientIp(servletRequest);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(authService.adminCreateUser(request, admin, ip));
+    }
+
+    @Operation(
+            summary = "Update an existing staff member or user account, role, domain, and status",
+            description = "Updates a user's details, RBAC role, domain, role title, lock status, or password, increments JWT tokenVersion on security-context changes, and records `ADMIN_STAFF_USER_UPDATED` in the audit log."
+    )
+    @PutMapping("/users/{id}")
+    public ResponseEntity<UserProfileDto> updateUser(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateStaffUserRequest request,
+            @AuthenticationPrincipal AppUserPrincipal admin,
+            HttpServletRequest servletRequest) {
+        String ip = auditService.resolveClientIp(servletRequest);
+        return ResponseEntity.ok(authService.adminUpdateUser(id, request, admin, ip));
+    }
+
+    @Operation(
+            summary = "List configured staff and operational roles",
+            description = "Returns operational banking role templates mapped to RBAC security roles and institutional domains."
+    )
+    @GetMapping("/roles")
+    public ResponseEntity<List<StaffRoleDefinitionDto>> listRoles() {
+        return ResponseEntity.ok(authService.listStaffRoles());
+    }
+
+    @Operation(
+            summary = "Create a new operational staff/partner role definition",
+            description = "Adds a new banking role mapping an operational title to a base RBAC role and institutional domain, logging `ADMIN_ROLE_CREATED`."
+    )
+    @PostMapping("/roles")
+    public ResponseEntity<StaffRoleDefinitionDto> createRole(
+            @Valid @RequestBody UpsertStaffRoleRequest request,
+            @AuthenticationPrincipal AppUserPrincipal admin,
+            HttpServletRequest servletRequest) {
+        String ip = auditService.resolveClientIp(servletRequest);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(authService.createStaffRole(request, admin, ip));
+    }
+
+    @Operation(
+            summary = "Update an existing operational staff/partner role definition",
+            description = "Updates a role definition and propagates display title changes to assigned staff profiles, logging `ADMIN_ROLE_UPDATED`."
+    )
+    @PutMapping("/roles/{roleCode}")
+    public ResponseEntity<StaffRoleDefinitionDto> updateRole(
+            @PathVariable String roleCode,
+            @Valid @RequestBody UpsertStaffRoleRequest request,
+            @AuthenticationPrincipal AppUserPrincipal admin,
+            HttpServletRequest servletRequest) {
+        String ip = auditService.resolveClientIp(servletRequest);
+        return ResponseEntity.ok(authService.updateStaffRole(roleCode, request, admin, ip));
     }
 
     @Operation(

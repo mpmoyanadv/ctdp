@@ -4,6 +4,10 @@ import { map, Observable } from 'rxjs';
 import {
   AuditLogEntry,
   BankTransaction,
+  CreateStaffUserRequest,
+  CustomerCallerVerificationRequest,
+  CustomerCallerVerificationResponse,
+  CustomerKycLookupResponse,
   DisputeCategory,
   DisputeDetail,
   DisputeStatus,
@@ -13,6 +17,9 @@ import {
   PageResponse,
   ProductivityReport,
   SmsWebhookSimulationRequest,
+  StaffRoleDefinition,
+  UpdateStaffUserRequest,
+  UpsertStaffRoleRequest,
   UserDomain,
   UserProfile,
   VoiceCallSimulationRequest
@@ -137,6 +144,26 @@ export class PortalApiService {
     return this.http.get<UserProfile[]>('/api/v1/admin/users');
   }
 
+  createAdminUser(payload: CreateStaffUserRequest): Observable<UserProfile> {
+    return this.http.post<UserProfile>('/api/v1/admin/users', payload);
+  }
+
+  updateAdminUser(userId: string, payload: UpdateStaffUserRequest): Observable<UserProfile> {
+    return this.http.put<UserProfile>(`/api/v1/admin/users/${userId}`, payload);
+  }
+
+  getAdminRoles(): Observable<StaffRoleDefinition[]> {
+    return this.http.get<StaffRoleDefinition[]>('/api/v1/admin/roles');
+  }
+
+  createAdminRole(payload: UpsertStaffRoleRequest): Observable<StaffRoleDefinition> {
+    return this.http.post<StaffRoleDefinition>('/api/v1/admin/roles', payload);
+  }
+
+  updateAdminRole(roleCode: string, payload: UpsertStaffRoleRequest): Observable<StaffRoleDefinition> {
+    return this.http.put<StaffRoleDefinition>(`/api/v1/admin/roles/${encodeURIComponent(roleCode)}`, payload);
+  }
+
   unlockUser(userId: string): Observable<UserProfile> {
     return this.http.post<UserProfile>(`/api/v1/admin/users/${userId}/unlock`, {});
   }
@@ -152,6 +179,22 @@ export class PortalApiService {
       assignedDomain,
       status
     });
+  }
+
+  lookupCustomerBySaId(saIdNumber: string): Observable<CustomerKycLookupResponse> {
+    const params = new HttpParams().set('saIdNumber', saIdNumber);
+    return this.http.get<CustomerKycLookupResponse>('/api/v1/omnichannel/lookup-customer', { params });
+  }
+
+  markCallerNotVerified(saIdNumber: string, reason?: string): Observable<{ verified: boolean; message: string }> {
+    return this.http.post<{ verified: boolean; message: string }>('/api/v1/omnichannel/not-verified', {
+      saIdNumber,
+      reason
+    });
+  }
+
+  verifyCustomerCaller(payload: CustomerCallerVerificationRequest): Observable<CustomerCallerVerificationResponse> {
+    return this.http.post<CustomerCallerVerificationResponse>('/api/v1/omnichannel/verify-customer', payload);
   }
 
   simulateSmsWebhook(payload: SmsWebhookSimulationRequest): Observable<OmnichannelSimulationResponse> {

@@ -26,7 +26,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -63,8 +65,10 @@ class TransactionIntegrityTest {
         String customer1Token = loginAndExtractToken("customer@capi.test", "Password123!");
         String customer2Token = loginAndExtractToken("customer2@capi.test", "Password123!");
         String staffToken = loginAndExtractToken("staff@capi.test", "Password123!");
+        String adminToken = loginAndExtractToken("admin@capi.test", "Password123!");
 
         AppUser customer1 = appUserRepository.findByEmailIgnoreCase("customer@capi.test").orElseThrow();
+        AppUser staffUser = appUserRepository.findByEmailIgnoreCase("staff@capi.test").orElseThrow();
 
         BankTransaction settledTx = saveTx(
                 customer1.getId(),
@@ -126,7 +130,14 @@ class TransactionIntegrityTest {
                         .content(duplicateBody))
                 .andExpect(status().isConflict());
 
-        // 4. Once the dispute reaches REJECTED (terminal), re-opening as a linked dispute is allowed
+        // 4. Supervisor assigns the dispute to staff, who marks it REJECTED (terminal), allowing linked re-open
+        mockMvc.perform(post("/api/v1/admin/disputes/" + disputeId + "/assign")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"assignedDomain\":\"INTERNAL_CAPI\",\"assigneeUserId\":\"" + staffUser.getId() + "\",\"status\":\"IN_REVIEW\",\"note\":\"Assigned for transaction integrity verification\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_REVIEW"));
+
         mockMvc.perform(patch("/api/v1/disputes/" + disputeId + "/status")
                         .header("Authorization", "Bearer " + staffToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -180,6 +191,34 @@ class TransactionIntegrityTest {
                             .content(body))
                     .andExpect(status().isConflict());
         }
+    }
+
+    @Test
+    void listsOnlyAuthenticatedCustomerTransactionsAndRejectsNonCustomerRoles() throws Exception {
+        String customer1Token = loginAndExtractToken("customer@capi.test", "Password123!");
+        String customer2Token = loginAndExtractToken("customer2@capi.test", "Password123!");
+        String staffToken = loginAndExtractToken("staff@capi.test", "Password123!");
+
+        MvcResult c1Result = mockMvc.perform(get("/api/v1/transactions")
+                        .header("Authorization", "Bearer " + customer1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[0].transactionReference").isNotEmpty())
+                .andReturn();
+        String c1Body = c1Result.getResponse().getContentAsString();
+        assertThat(c1Body).contains("TXN-2026-9001").doesNotContain("TXN-2026-9101");
+
+        MvcResult c2Result = mockMvc.perform(get("/api/v1/transactions")
+                        .header("Authorization", "Bearer " + customer2Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andReturn();
+        String c2Body = c2Result.getResponse().getContentAsString();
+        assertThat(c2Body).contains("TXN-2026-9101").doesNotContain("TXN-2026-9001");
+
+        mockMvc.perform(get("/api/v1/transactions")
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isForbidden());
     }
 
     private BankTransaction saveTx(

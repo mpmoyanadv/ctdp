@@ -45,9 +45,68 @@ public final class ApiDtos {
             @Schema(description = "Full legal name", example = "Thabo Mokoena") String fullName,
             @Schema(description = "RBAC security role (`CUSTOMER`, `STAFF`, `AFFILIATE`, `ADMIN`)") UserRole role,
             @Schema(description = "Organizational boundary domain (`CUSTOMER`, `INTERNAL_CAPI`, `PARTNER_BANKSERV`, `PARTNER_MERCHANT`)") UserDomain userDomain,
-            @Schema(description = "External clearing/merchant partner institution name when applicable", example = "BankservAfrica") String partnerInstitution,
+            @Schema(description = "Operational role title or external partner institution name", example = "Dispute Investigator") String partnerInstitution,
             @Schema(description = "True if the account is locked due to customer-reported login fraud") boolean isLocked,
-            @Schema(description = "Audit reason recorded when the account was locked") String lockedReason
+            @Schema(description = "Audit reason recorded when the account was locked") String lockedReason,
+            @Schema(description = "Registered contact phone number", example = "+27219411000") String phoneNumber
+    ) {
+        public UserProfileDto(
+                UUID id,
+                String email,
+                String fullName,
+                UserRole role,
+                UserDomain userDomain,
+                String partnerInstitution,
+                boolean isLocked,
+                String lockedReason) {
+            this(id, email, fullName, role, userDomain, partnerInstitution, isLocked, lockedReason, null);
+        }
+    }
+
+    @Schema(description = "Configurable banking operational role definition mapping an operational title to a base RBAC role and domain.")
+    public record StaffRoleDefinitionDto(
+            String roleCode,
+            String displayName,
+            UserRole baseRole,
+            UserDomain defaultDomain,
+            String description
+    ) {}
+
+    @Schema(description = "Admin request to create or update a banking operational role definition.")
+    public record UpsertStaffRoleRequest(
+            String roleCode,
+            @NotBlank(message = "Role display name is required") String displayName,
+            @NotNull(message = "Base security role is required") UserRole baseRole,
+            @NotNull(message = "Default user domain is required") UserDomain defaultDomain,
+            String description
+    ) {}
+
+    @Schema(description = "Admin request to provision a new staff, supervisor/admin, or partner user account.")
+    public record CreateStaffUserRequest(
+            @NotBlank(message = "Full name is required") String fullName,
+            @NotBlank(message = "Email is required")
+            @Email(message = "Valid email is required")
+            String email,
+            String phoneNumber,
+            @NotNull(message = "Role is required") UserRole role,
+            @NotNull(message = "User domain is required") UserDomain userDomain,
+            String partnerInstitution,
+            String password
+    ) {}
+
+    @Schema(description = "Admin request to update an existing user's details, role, domain, operational title, password, or lock state.")
+    public record UpdateStaffUserRequest(
+            @NotBlank(message = "Full name is required") String fullName,
+            @NotBlank(message = "Email is required")
+            @Email(message = "Valid email is required")
+            String email,
+            String phoneNumber,
+            @NotNull(message = "Role is required") UserRole role,
+            @NotNull(message = "User domain is required") UserDomain userDomain,
+            String partnerInstitution,
+            Boolean isLocked,
+            String lockedReason,
+            String newPassword
     ) {}
 
     @Schema(description = "Stateless JWT authentication token and user profile returned on successful login.")
@@ -308,7 +367,7 @@ public final class ApiDtos {
             Instant timestamp
     ) {}
 
-    @Schema(description = "Aggregated investigator turnaround time and case productivity metrics calculated from `StaffWorkSession` records.")
+    @Schema(description = "Aggregated investigator turnaround time and case productivity metrics calculated from `StaffWorkSession` timers and live dispute assignments.")
     public record StaffProductivityRowDto(
             UUID staffId,
             String staffEmail,
@@ -317,8 +376,39 @@ public final class ApiDtos {
             long activeSessions,
             long totalDurationSeconds,
             double averageDurationSeconds,
-            long distinctDisputesHandled
-    ) {}
+            long distinctDisputesHandled,
+            String staffRole,
+            String staffRoleTitle,
+            long currentlyAssignedDisputes,
+            long callCentreDisputesLogged,
+            long resolvedDisputesCount
+    ) {
+        public StaffProductivityRowDto(
+                UUID staffId,
+                String staffEmail,
+                String staffFullName,
+                long completedSessions,
+                long activeSessions,
+                long totalDurationSeconds,
+                double averageDurationSeconds,
+                long distinctDisputesHandled) {
+            this(
+                    staffId,
+                    staffEmail,
+                    staffFullName,
+                    completedSessions,
+                    activeSessions,
+                    totalDurationSeconds,
+                    averageDurationSeconds,
+                    distinctDisputesHandled,
+                    UserRole.STAFF.name(),
+                    "Dispute Investigator",
+                    activeSessions,
+                    0L,
+                    0L
+            );
+        }
+    }
 
     @Schema(description = "Individual investigator work-session timer log entry.")
     public record WorkSessionDetailDto(
@@ -329,8 +419,39 @@ public final class ApiDtos {
             String staffEmail,
             Instant startedAt,
             Instant completedAt,
-            Long totalDurationSeconds
-    ) {}
+            Long totalDurationSeconds,
+            String staffFullName,
+            String disputeStatus,
+            String assignmentSource,
+            String sessionOutcome,
+            Long elapsedDurationSeconds
+    ) {
+        public WorkSessionDetailDto(
+                Long sessionId,
+                UUID disputeId,
+                String disputeReference,
+                UUID staffId,
+                String staffEmail,
+                Instant startedAt,
+                Instant completedAt,
+                Long totalDurationSeconds) {
+            this(
+                    sessionId,
+                    disputeId,
+                    disputeReference,
+                    staffId,
+                    staffEmail,
+                    startedAt,
+                    completedAt,
+                    totalDurationSeconds,
+                    staffEmail,
+                    "IN_REVIEW",
+                    "Supervisor / Admin Assignment",
+                    completedAt != null ? "Completed" : "Active (In Review)",
+                    totalDurationSeconds
+            );
+        }
+    }
 
     @Schema(description = "Supervisor productivity report combining per-staff turnaround aggregates and recent session logs.")
     public record ProductivityReportDto(
@@ -387,6 +508,14 @@ public final class ApiDtos {
             UUID transactionId,
             @Schema(description = "Optional transaction reference quoted by customer (e.g. TXN-2026-9001)", example = "TXN-2026-9001")
             String transactionReference,
+            @Schema(description = "Optional merchant or counterparty name", example = "Shell Braamfontein")
+            String merchantName,
+            @Schema(description = "Optional transaction type / payment rail (`EFT`, `ATM_WITHDRAWAL`, `CARD_POS`, `DEBIT_ORDER`, `PAYSHAP`, `ONLINE_ECOMMERCE`)", example = "CARD_POS")
+            String paymentRail,
+            @Schema(description = "Optional transaction location", example = "Braamfontein, Johannesburg")
+            String location,
+            @Schema(description = "Optional disputed amount in ZAR", example = "850.00")
+            BigDecimal amount,
             @Schema(description = "Preset scenario identifier (`ATM_NO_CASH`, `FILLING_STATION_DOUBLE_TAP`, `SUSPICIOUS_ACTIVITY`)", example = "FILLING_STATION_DOUBLE_TAP")
             String scenario,
             @Schema(description = "Selected dispute category")
@@ -411,6 +540,51 @@ public final class ApiDtos {
             @Schema(description = "Generated outbound SMS/WhatsApp auto-reply or call reference confirmation") String outboundReply,
             @Schema(description = "Recorded call transcript or gateway parsing summary") String channelTranscript,
             Instant processedAt
+    ) {}
+
+    @Schema(description = "Staff caller KYC and credit-bureau verification request requiring SA ID number plus at least two secondary answers.")
+    public record CustomerCallerVerificationRequest(
+            @Schema(description = "13-digit South African ID number of the calling customer", example = "8501015800082")
+            @NotBlank(message = "SA ID number is required")
+            String saIdNumber,
+            @Schema(description = "Optional security check 1: Registered cellphone number (MSISDN)", example = "+27825550192")
+            String phoneNumber,
+            @Schema(description = "Optional security check 2: Global One account number or last 4 digits", example = "1548920341")
+            String accountNumber,
+            @Schema(description = "Optional credit-bureau check 3: Whether caller holds an active Capi Credit Card facility", example = "false")
+            Boolean hasCreditCardFacility,
+            @Schema(description = "Optional credit-bureau / mandate check 4: Whether caller has an active DebiCheck debit order mandate", example = "true")
+            Boolean hasActiveDebitOrderMandate
+    ) {}
+
+    @Schema(description = "Verified customer profile, bureau summary, and settled transactions returned to Call Centre staff.")
+    public record CustomerCallerVerificationResponse(
+            boolean verified,
+            int questionsAnswered,
+            String verificationSummary,
+            String creditBureauProfileSummary,
+            CustomerSummaryDto customer,
+            List<TransactionDto> transactions
+    ) {}
+
+    @Schema(description = "Customer KYC and credit-bureau details loaded by SA ID for Call Centre agent telephone verification.")
+    public record CustomerKycLookupResponse(
+            UUID customerId,
+            String fullName,
+            String email,
+            String saIdNumber,
+            String phoneNumber,
+            String accountNumber,
+            boolean hasCreditCardFacility,
+            boolean hasActiveDebitOrderMandate,
+            String creditBureauProfileSummary
+    ) {}
+
+    @Schema(description = "Request recorded when a calling customer fails telephone identity verification.")
+    public record CallerNotVerifiedRequest(
+            @NotBlank(message = "SA ID number is required")
+            String saIdNumber,
+            String reason
     ) {}
 
     @Schema(description = "Standard paginated response envelope.")

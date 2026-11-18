@@ -1,13 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { PortalApiService } from '../../core/services/portal-api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { DisputeSummary } from '../../core/models/portal.models';
 
 @Component({
   selector: 'app-staff-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -15,7 +17,7 @@ import { DisputeSummary } from '../../core/models/portal.models';
           <span class="text-xs font-bold uppercase tracking-wider text-capi-blue">Internal Capi Operations</span>
           <h1 class="text-2xl font-bold text-slate-900 mt-0.5">Dispute Investigator Workbench</h1>
           <p class="text-sm text-slate-500 mt-1">
-            Claim open cases to start productivity session tracking, request customer affidavits, delegate PayShap cases to BankservAfrica, or escalate to Supervisor.
+            Work on disputes assigned to you by a Supervisor/Admin or automatically assigned during Call Centre intake.
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -31,6 +33,40 @@ import { DisputeSummary } from '../../core/models/portal.models';
             </button>
           }
         </div>
+      </div>
+
+      <!-- Call Centre Intake Simulator & Search Bar (Between Header and Disputes List) -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
+          <div class="relative w-full md:w-96">
+            <input
+              id="staff-dispute-search"
+              type="text"
+              name="searchQuery"
+              [(ngModel)]="searchQuery"
+              placeholder="Search by Dispute Reference, Customer Email, or SA ID Number..."
+              class="w-full px-3.5 py-2 pr-14 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-capi-blue outline-none"
+            />
+            @if (searchQuery) {
+              <button
+                type="button"
+                (click)="searchQuery = ''"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-slate-500 hover:text-slate-800"
+              >
+                Clear
+              </button>
+            }
+          </div>
+          <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold whitespace-nowrap">
+            {{ filteredDisputes().length }} of {{ disputes.length }} cases
+          </span>
+        </div>
+
+        <a routerLink="/simulator"
+           id="staff-open-simulator-btn"
+           class="px-4 py-2.5 rounded-xl bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold shadow-sm transition whitespace-nowrap text-center">
+          Call Centre Intake Simulator
+        </a>
       </div>
 
       @if (actionBanner) {
@@ -67,6 +103,9 @@ import { DisputeSummary } from '../../core/models/portal.models';
                   <td class="px-5 py-4">
                     <div class="font-medium text-slate-900">{{ d.customer.fullName }}</div>
                     <div class="text-xs text-slate-500">{{ d.customer.email }}</div>
+                    @if (d.customer.saIdNumber) {
+                      <div class="text-[11px] font-mono text-slate-400">ID: {{ d.customer.saIdNumber }}</div>
+                    }
                   </td>
                   <td class="px-5 py-4">
                     <div class="font-medium text-slate-800">{{ d.merchantName }}</div>
@@ -75,34 +114,35 @@ import { DisputeSummary } from '../../core/models/portal.models';
                   <td class="px-5 py-4 font-bold text-slate-900">R {{ d.amount | number:'1.2-2' }}</td>
                   <td class="px-5 py-4 text-xs">
                     <div class="font-semibold text-slate-700">{{ d.assignedDomain }}</div>
-                    <div class="text-slate-500">{{ d.assignedUserName || 'Unassigned' }}</div>
+                    @if (isAssignedToCurrentUser(d)) {
+                      <span class="inline-block mt-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
+                        Assigned to You
+                      </span>
+                    } @else if (d.assignedUserName) {
+                      <span class="inline-block mt-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold">
+                        Assigned: {{ d.assignedUserName }}
+                      </span>
+                    } @else {
+                      <span class="inline-block mt-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-semibold">
+                        Unassigned &mdash; Awaiting Admin
+                      </span>
+                    }
                   </td>
                   <td class="px-5 py-4">
                     <span [class]="statusBadge(d.status)">{{ d.status }}</span>
                   </td>
-                  <td class="px-5 py-4 text-right space-x-2 whitespace-nowrap">
-                    @if (!d.terminal && d.status === 'LOGGED') {
-                      <button
-                        type="button"
-                        (click)="claimAndOpen(d)"
-                        class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition"
-                      >
-                        Claim Case
-                      </button>
+                  <td class="px-5 py-4 text-right whitespace-nowrap">
+                    @if (isAssignedToCurrentUser(d)) {
+                      <a [routerLink]="['/disputes', d.id]"
+                         class="px-3.5 py-1.5 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition inline-block">
+                        Work on Case
+                      </a>
+                    } @else {
+                      <a [routerLink]="['/disputes', d.id]"
+                         class="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition inline-block">
+                        View Case (Read-Only)
+                      </a>
                     }
-                    @if (!d.terminal && d.assignedDomain === 'INTERNAL_CAPI' && d.paymentRail === 'PAYSHAP') {
-                      <button
-                        type="button"
-                        (click)="delegateToBankserv(d)"
-                        class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition"
-                      >
-                        Assign PARTNER_BANKSERV
-                      </button>
-                    }
-                    <a [routerLink]="['/disputes', d.id]"
-                       class="px-3 py-1.5 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition inline-block">
-                      Open Case
-                    </a>
                   </td>
                 </tr>
               }
@@ -116,10 +156,12 @@ import { DisputeSummary } from '../../core/models/portal.models';
 export class StaffDashboardComponent implements OnInit {
   disputes: DisputeSummary[] = [];
   activeFilter = 'ALL';
+  searchQuery = '';
   actionBanner = '';
 
   filters = [
     { key: 'ALL', label: 'All Cases' },
+    { key: 'MY_ASSIGNED', label: 'My Assigned Cases' },
     { key: 'LOGGED', label: 'Open (LOGGED)' },
     { key: 'IN_REVIEW', label: 'In Review' },
     { key: 'PENDING_CUSTOMER_ACTION', label: 'Pending Customer' },
@@ -127,7 +169,7 @@ export class StaffDashboardComponent implements OnInit {
     { key: 'ESCALATED', label: 'Escalated' }
   ];
 
-  constructor(private api: PortalApiService, private router: Router) {}
+  constructor(private api: PortalApiService, public auth: AuthService) {}
 
   ngOnInit(): void {
     this.loadDisputes();
@@ -137,24 +179,34 @@ export class StaffDashboardComponent implements OnInit {
     this.api.getDisputes().subscribe((list) => (this.disputes = list));
   }
 
+  isAssignedToCurrentUser(d: DisputeSummary): boolean {
+    const uid = this.auth.currentUser()?.id;
+    return !!uid && d.assignedUserId === uid;
+  }
+
   filteredDisputes(): DisputeSummary[] {
-    if (this.activeFilter === 'ALL') return this.disputes;
-    return this.disputes.filter((d) => d.status === this.activeFilter);
-  }
+    let list: DisputeSummary[];
+    if (this.activeFilter === 'ALL') {
+      list = this.disputes;
+    } else if (this.activeFilter === 'MY_ASSIGNED') {
+      list = this.disputes.filter((d) => this.isAssignedToCurrentUser(d));
+    } else {
+      list = this.disputes.filter((d) => d.status === this.activeFilter);
+    }
 
-  claimAndOpen(d: DisputeSummary): void {
-    this.api.claimDispute(d.id).subscribe(() => {
-      this.router.navigate(['/disputes', d.id]);
-    });
-  }
+    const q = this.searchQuery.trim().toLowerCase();
+    if (!q) {
+      return list;
+    }
 
-  delegateToBankserv(d: DisputeSummary): void {
-    this.api
-      .delegateDispute(d.id, 'PARTNER_BANKSERV', 'Delegated PayShap dispute to BankservAfrica clearing rail')
-      .subscribe((updated) => {
-        this.actionBanner = `Dispute ${updated.disputeReference} delegated to PARTNER_BANKSERV (${updated.status}).`;
-        this.loadDisputes();
-      });
+    return list.filter(
+      (d) =>
+        d.disputeReference.toLowerCase().includes(q) ||
+        (d.originalDisputeReference?.toLowerCase().includes(q) ?? false) ||
+        d.customer.email.toLowerCase().includes(q) ||
+        (d.customer.saIdNumber?.toLowerCase().includes(q) ?? false) ||
+        d.customer.fullName.toLowerCase().includes(q)
+    );
   }
 
   statusBadge(status: string): string {

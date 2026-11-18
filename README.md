@@ -58,13 +58,13 @@ transactions_dispute_portal/
 │       │   ├── infrastructure/   # JWT/CORS/Proxy/Correlation security, Redis locks & rate limiters, Kafka, DataSeeder
 │       │   └── presentation/     # REST controllers, validated DTOs, GlobalExceptionHandler
 │       ├── main/resources/db/migration/ # Flyway migrations: common (V1, V3) + postgresql (V2)
-│       └── test/java/za/co/capi/dispute/ # 22 JUnit 5 test classes (65 test executions)
+│       └── test/java/za/co/capi/dispute/ # 22 JUnit 5 test classes (68 test executions)
 └── frontend/
     ├── Dockerfile            # Multi-stage Node 22 (`npm ci --legacy-peer-deps`) build -> Nginx 1.27 Alpine
     ├── nginx.conf            # SPA routing + reverse proxy to backend:8080 (`X-Forwarded-For: $remote_addr`)
     ├── package-lock.json     # Locked frontend dependencies
     └── src/app/
-        ├── core/             # AuthService, PortalApiService, authInterceptor, authGuard/roleGuard + 4 *.spec.ts suites (12 specs)
+        ├── core/             # AuthService, PortalApiService, authInterceptor, authGuard/roleGuard + 4 *.spec.ts suites (20 specs)
         └── features/         # Login, Fraud Report, OTP Reset, Customer, Staff, Affiliate, Admin, Dispute Detail, Simulator
 ```
 
@@ -80,14 +80,14 @@ transactions_dispute_portal/
 - **Brute-Force Protection, Fraud Lockdown & OTP Recovery:** `LoginRateLimiterService` locks an account for 15 minutes (`900s`) after 5 consecutive failures and returns `429 Too Many Requests` after 20 failures per IP in 5 minutes (`300s`). `AuthService` returns uniform `401 Unauthorized` payloads and equalized BCrypt timing across unknown, locked, and wrong-password attempts, and resets counters on success. Customer logins email a one-click fraud alert (`It Wasn't Me`) that revokes active JWTs via `tokenVersion` and emails a cryptographic 6-digit OTP (never in email subjects or logs).
 - **Redis Idempotency Locking:** `POST /api/v1/disputes` uses atomic Redis `SET NX EX` locks via `IdempotencyLockService` to prevent duplicate submissions on retries (`409 Conflict`).
 - **After-Commit Kafka & Email Delivery:** `KafkaEventService` and `NotificationEmailService` dispatch events and HTML-escaped emails via `@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)` so rolled-back transactions never leak side effects, with bounded 5-second SMTP timeouts.
-- **Strict Omnichannel SMS / WhatsApp / Voice Simulator:** Interactive simulator at `/simulator` validates registered customer phone numbers and transaction references (`transactionId` or `TXN-YYYY-XXXX`), returning `400 Bad Request` when missing and keeping channel intake notes internal (`internalOnly = true`) without storing raw phone numbers in metadata or note bodies.
+- **Staff-Only Call Centre KYC & Omnichannel Dispute Intake:** Accessible exclusively to internal `STAFF` and `ADMIN` operators at `/simulator` (removed from customer navigation and dashboards). Requires verifying the calling customer's SA ID number plus at least two security/credit-bureau checks (`POST /api/v1/omnichannel/verify-customer`) before unlocking the caller's transactions and logging a Voice Call or SMS/WhatsApp dispute on their behalf (`internalOnly = true` channel notes and no raw phone numbers in metadata or note bodies).
 - **SQL-Aggregated Staff Productivity Tracking:** `ProductivityService` and `StaffWorkSessionRepository` aggregate investigator work sessions directly in SQL and fetch attachment counts in a single grouped query (`DisputeAttachmentRepository`).
 
 ---
 
 ## Pre-Seeded Demo Accounts (`demo` profile)
 
-When `SPRING_PROFILES_ACTIVE=demo` (enabled in `.env.example` for quick local evaluation), `DataSeeder` seeds 5 users (all with password `Password123!`), 6 sample transactions, 1 active PayShap dispute (`DSP-2026-10042`), and 1 historic refunded dispute (`DSP-2026-09811`):
+When `SPRING_PROFILES_ACTIVE=demo` (enabled in `.env.example` for quick local evaluation), `DataSeeder` seeds 5 users (all with password `Password123!`), 7 sample transactions, 1 active PayShap dispute (`DSP-2026-10042`), and 1 historic refunded dispute (`DSP-2026-09811`):
 
 | Email | Role | Domain |
 | :--- | :--- | :--- |
@@ -163,7 +163,7 @@ docker compose down -v
 
 ## Testing & Verification
 
-### Automated Backend Tests (22 JUnit 5 Classes, 65 Test Executions)
+### Automated Backend Tests (22 JUnit 5 Classes, 68 Test Executions)
 
 The backend test suite runs automatically during Docker image builds or locally via Maven Wrapper:
 
@@ -173,12 +173,12 @@ cd backend
 ```
 
 Test suite breakdown across all **22** classes:
-- **End-to-End Lifecycle & Focus Tests:** `DisputePortalIntegrationTest` (5 focused tests covering multipart disputes, idempotency, IDOR, fraud/OTP reset, claim/reply/escalation/delegation/reopen, admin/Kafka/OpenAPI, omnichannel SMS & voice), `DisputeAuthorizationAndTransitionTest` (5 focused role, domain, transition, and assignment tests), `TransactionIntegrityTest` (2 tests), `PaginationAndQueryOptimizationTest` (1 test)
+- **End-to-End Lifecycle & Focus Tests:** `DisputePortalIntegrationTest` (6 focused tests covering multipart disputes, idempotency, IDOR, fraud/OTP reset, claim/reply/escalation/delegation/reopen, admin users/unlock/audit CSV/productivity/Kafka/OpenAPI, and staff-only omnichannel intake), `DisputeAuthorizationAndTransitionTest` (5 focused role, domain, transition, and assignment tests), `TransactionIntegrityTest` (3 tests including `CUSTOMER`-only transaction feed enforcement), `PaginationAndQueryOptimizationTest` (1 test)
 - **Security, Authentication & Proxy Trust:** `OtpSecurityTest` (5 tests including log/subject redaction via `CapturedOutput` and HTML escaping), `LoginBruteForceAndLockoutTest` (4 tests covering 5-failure account lock, 20-failure/5-minute IP `429`, counter reset, and uniform timing/401), `FraudRecoveryConfirmationTest` (1 test), `CorsAndProxyTrustTest` (4 tests including right-most untrusted `X-Forwarded-For` resolution), `JwtSecretValidationTest` (3 tests), `AttachmentSecurityTest` (1 test), `AuditCsvSanitizationTest` (2 tests)
-- **Validation, Concurrency, Errors, Masking & Omnichannel:** `DisputeValidationParameterizedTest` (10 parameterized executions across JSON and multipart endpoints), `DisputeConcurrentClaimTest` (1 multi-threaded `CountDownLatch` claim race test), `GlobalExceptionHandlerTest` (2 tests covering sanitized 400 responses, 500 `traceId`, and full stack-trace logging), `DisputeTransitionPolicyTest` (9 tests covering every source row in the transition matrix plus role/null guards), `PiiMaskingServiceTest` (2 tests including free-text identifier masking), `OmnichannelAndAffiliatePiiTest` (2 tests)
-- **Profile Gating, Kafka & Schema Migrations:** `DataSeederWithDemoProfileTest` (1 test), `DataSeederWithoutDemoProfileTest` (1 test), `KafkaEventServiceTest` (2 tests), `FlywayMigrationAndConstraintTest` (1 H2 migration test), `PostgresMigrationTestcontainersTest` (1 `@Testcontainers(disabledWithoutDocker = true)` test executing `V1`, `V2`, `V3` against `postgres:16-alpine` when Docker is running)
+- **Validation, Concurrency, Errors, Masking & Omnichannel:** `DisputeValidationParameterizedTest` (10 parameterized executions across JSON and multipart endpoints), `DisputeConcurrentClaimTest` (1 multi-threaded `CountDownLatch` claim race test), `GlobalExceptionHandlerTest` (2 tests covering sanitized 400 responses, 500 `traceId`, and full stack-trace logging), `DisputeTransitionPolicyTest` (9 tests covering every source row in the transition matrix plus role/null guards), `PiiMaskingServiceTest` (2 tests including free-text identifier masking), `OmnichannelAndAffiliatePiiTest` (3 tests covering affiliate free-text PII masking, strict omnichannel inputs, and caller KYC/credit-bureau verification)
+- **Profile Gating, Kafka & Schema Migrations:** `DataSeederWithDemoProfileTest` (1 test), `DataSeederWithoutDemoProfileTest` (1 test), `KafkaEventServiceTest` (2 tests), `FlywayMigrationAndConstraintTest` (1 H2 migration test), `PostgresMigrationTestcontainersTest` (1 `@Testcontainers(disabledWithoutDocker = true)` test executing `V1`, `V2`, `V3` against `postgres:16-alpine` when Docker is running; configured with `api.version=1.44` in `docker-java.properties` for Docker 29+ compatibility)
 
-### Automated Frontend Tests (4 Jasmine/Karma Spec Files, 12 Specs)
+### Automated Frontend Tests (4 Jasmine/Karma Spec Files, 20 Specs)
 
 ```bash
 cd frontend
@@ -186,7 +186,7 @@ npm ci --legacy-peer-deps
 NG_CLI_ANALYTICS=false npm test
 ```
 
-Covers `AuthService` (`auth.service.spec.ts`), `PortalApiService` (`portal-api.service.spec.ts`), `authGuard` / `roleGuard` (`auth.guard.spec.ts`), and `authInterceptor` (`auth.interceptor.spec.ts`) in headless Chrome (`12` specs total).
+Covers all `AuthService` and `PortalApiService` endpoints, `authGuard` / `roleGuard`, and `authInterceptor` in headless Chrome (`20` specs total).
 
 ### End-to-End Smoke Verification & CI
 
@@ -227,8 +227,9 @@ GitHub Actions CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs th
 | `GET /api/v1/admin/events/kafka-stream` | `ADMIN` | Inspect Kafka topics/events and Redis lock status |
 | `POST /api/v1/admin/users/{id}/unlock` | `ADMIN` | Unlock a locked user account |
 | `POST /api/v1/admin/disputes/{id}/assign` | `ADMIN` | Assign/reassign dispute to investigator or partner domain |
-| `POST /api/v1/omnichannel/sms-webhook` | Authenticated | Simulate inbound SMS/WhatsApp dispute intake (strict phone + transaction required) |
-| `POST /api/v1/omnichannel/voice-call` | Authenticated | Simulate Call Centre / IVR voice call dispute intake (strict phone + transaction required) |
+| `POST /api/v1/omnichannel/verify-customer` | `STAFF`, `ADMIN` | Verify calling customer via SA ID + >=2 security/credit-bureau checks and return transactions |
+| `POST /api/v1/omnichannel/sms-webhook` | `STAFF`, `ADMIN` | Simulate inbound SMS/WhatsApp dispute intake on customer's behalf (strict phone + transaction required) |
+| `POST /api/v1/omnichannel/voice-call` | `STAFF`, `ADMIN` | Simulate Call Centre / IVR voice call dispute intake on customer's behalf (strict phone + transaction required) |
 
 ---
 

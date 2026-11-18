@@ -8,7 +8,8 @@ import { AuthService } from '../../core/services/auth.service';
 import {
   DisputeAttachment,
   DisputeDetail,
-  DisputeStatus
+  DisputeStatus,
+  UserProfile
 } from '../../core/models/portal.models';
 
 @Component({
@@ -78,6 +79,9 @@ import {
                 <div class="text-xs text-slate-500">Disputed Amount</div>
                 <div class="text-2xl font-extrabold text-slate-900">R {{ dispute.amount | number:'1.2-2' }}</div>
                 <div class="text-xs text-slate-500 mt-0.5">Domain: <strong>{{ dispute.assignedDomain }}</strong></div>
+                <div class="text-xs text-slate-500 mt-0.5">
+                  Assigned: <strong>{{ dispute.assignedUserName || 'Unassigned (Awaiting Admin)' }}</strong>
+                </div>
               </div>
             </div>
 
@@ -233,7 +237,7 @@ import {
                   </div>
                 }
 
-                @if (!dispute.terminal) {
+                @if (!dispute.terminal && (auth.currentUser()?.role !== 'STAFF' || canStaffWorkOnDispute())) {
                   <form (ngSubmit)="submitNote()" class="pt-4 border-t border-slate-100 space-y-3">
                     <label for="note-message-input" class="block text-xs font-bold uppercase text-slate-600">
                       Add Investigation / Case Note
@@ -324,7 +328,7 @@ import {
                   </div>
                 }
 
-                @if (!dispute.terminal && dispute.attachments.length < 5) {
+                @if (!dispute.terminal && dispute.attachments.length < 5 && (auth.currentUser()?.role !== 'STAFF' || canStaffWorkOnDispute())) {
                   <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <input
                       id="detail-upload-input"
@@ -384,22 +388,55 @@ import {
                 </div>
               </div>
 
+              <!-- Read-only notice for unassigned / other-staff investigators -->
+              @if (!dispute.terminal && auth.currentUser()?.role === 'STAFF' && !canStaffWorkOnDispute()) {
+                <div id="staff-unassigned-banner" class="bg-amber-50 rounded-2xl border-2 border-amber-300 p-5 text-amber-950 space-y-2">
+                  <div class="text-xs font-bold uppercase tracking-wider text-amber-800">Read-Only Mode</div>
+                  <p class="text-sm font-semibold">
+                    {{ dispute.assignedUserName ? 'Assigned to ' + dispute.assignedUserName : 'Unassigned — Awaiting Supervisor Assignment' }}
+                  </p>
+                  <p class="text-xs text-amber-900 leading-relaxed">
+                    Staff members cannot work on unassigned disputes or cases assigned to another investigator. A Supervisor/Admin must assign or reassign this ticket to you before you can add notes, delegate, or update status.
+                  </p>
+                </div>
+              }
+
+              <!-- Supervisor-Only Staff Assignment / Reassignment Card (ADMIN) -->
+              @if (!dispute.terminal && auth.currentUser()?.role === 'ADMIN') {
+                <div id="admin-assign-staff-card" class="bg-white rounded-2xl shadow-sm border-2 border-capi-blue/30 p-6 space-y-3">
+                  <h2 class="text-base font-bold text-slate-900">Supervisor Staff Assignment</h2>
+                  <p class="text-xs text-slate-500">
+                    Current Assignee: <strong>{{ dispute.assignedUserName || 'Unassigned' }}</strong>
+                  </p>
+                  <select
+                    id="detail-assign-staff-select"
+                    name="selectedStaffId"
+                    [(ngModel)]="selectedStaffId"
+                    class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white font-semibold"
+                  >
+                    <option value="">Select internal staff member...</option>
+                    @for (staff of staffUsers; track staff.id) {
+                      <option [value]="staff.id">{{ staff.fullName }} ({{ staff.email }})</option>
+                    }
+                  </select>
+                  <button
+                    id="detail-assign-staff-btn"
+                    type="button"
+                    [disabled]="busy || !selectedStaffId"
+                    (click)="assignToSelectedStaff()"
+                    class="w-full py-2.5 px-4 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-bold transition disabled:opacity-50"
+                  >
+                    {{ dispute.assignedUserId ? 'Reassign Staff Investigator' : 'Assign to Staff Investigator' }}
+                  </button>
+                </div>
+              }
+
               <!-- Investigator / Supervisor / Affiliate Workflow Controls -->
-              @if (!dispute.terminal && auth.currentUser()?.role !== 'CUSTOMER') {
+              @if (!dispute.terminal && auth.currentUser()?.role !== 'CUSTOMER' && (auth.currentUser()?.role !== 'STAFF' || canStaffWorkOnDispute())) {
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
                   <h2 class="text-base font-bold text-slate-900">Investigation Actions</h2>
 
                   @if (isStaffOrAdmin()) {
-                    <button
-                      id="claim-dispute-btn"
-                      type="button"
-                      [disabled]="busy"
-                      (click)="claimCase()"
-                      class="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition"
-                    >
-                      Claim Case (Start IN_REVIEW Work Timer)
-                    </button>
-
                     <button
                       id="escalate-supervisor-btn"
                       type="button"
@@ -510,6 +547,8 @@ export class DisputeDetailComponent implements OnInit {
   reopenReason = 'Submitting police affidavit and updated sworn statement for linked review.';
 
   additionalFiles: File[] = [];
+  staffUsers: UserProfile[] = [];
+  selectedStaffId = '';
   busy = false;
   actionFeedback = '';
   actionError = '';
@@ -522,6 +561,14 @@ export class DisputeDetailComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    if (this.auth.currentUser()?.role === 'ADMIN') {
+      this.api.getAdminUsers().subscribe({
+        next: (users) => {
+          this.staffUsers = users.filter((u) => u.role === 'STAFF' && !u.isLocked);
+        },
+        error: () => {}
+      });
+    }
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
       if (id) {
@@ -538,6 +585,7 @@ export class DisputeDetailComponent implements OnInit {
     this.api.getDisputeById(id).subscribe({
       next: (d) => {
         this.dispute = d;
+        this.selectedStaffId = d.assignedUserId || '';
       },
       error: (err: HttpErrorResponse) => {
         if (err.status === 403) {
@@ -557,18 +605,35 @@ export class DisputeDetailComponent implements OnInit {
     return role === 'STAFF' || role === 'ADMIN';
   }
 
-  claimCase(): void {
-    if (!this.dispute) return;
+  canStaffWorkOnDispute(): boolean {
+    const user = this.auth.currentUser();
+    if (!user || !this.dispute) {
+      return false;
+    }
+    if (user.role === 'ADMIN') {
+      return true;
+    }
+    if (user.role === 'STAFF') {
+      return !!this.dispute.assignedUserId && this.dispute.assignedUserId === user.id;
+    }
+    return false;
+  }
+
+  assignToSelectedStaff(): void {
+    if (!this.dispute || !this.selectedStaffId) return;
     this.busy = true;
-    this.api.claimDispute(this.dispute.id).subscribe({
+    this.actionError = '';
+    this.actionFeedback = '';
+    this.api.adminAssignDispute(this.dispute.id, this.selectedStaffId, 'INTERNAL_CAPI', 'IN_REVIEW').subscribe({
       next: (d) => {
         this.dispute = d;
+        this.selectedStaffId = d.assignedUserId || '';
         this.busy = false;
-        this.actionFeedback = `Case ${d.disputeReference} claimed (Status: IN_REVIEW). Productivity timer started.`;
+        this.actionFeedback = `Case ${d.disputeReference} assigned to ${d.assignedUserName || 'staff'} (Status: ${d.status}).`;
       },
       error: (err) => {
         this.busy = false;
-        this.actionError = err.error?.message || 'Could not claim dispute.';
+        this.actionError = err.error?.message || 'Failed to assign dispute.';
       }
     });
   }

@@ -190,6 +190,32 @@ public class DisputeService {
             String idempotencyKey,
             DisputeChannel sourceChannel,
             String contactChannelMetadata) {
+        return createDisputeWithChannel(
+                customerId,
+                actorEmail,
+                viewerRole,
+                request,
+                files,
+                ipAddress,
+                idempotencyKey,
+                sourceChannel,
+                contactChannelMetadata,
+                null
+        );
+    }
+
+    @Transactional
+    public DisputeDetailDto createDisputeWithChannel(
+            UUID customerId,
+            String actorEmail,
+            UserRole viewerRole,
+            CreateDisputeRequest request,
+            List<MultipartFile> files,
+            String ipAddress,
+            String idempotencyKey,
+            DisputeChannel sourceChannel,
+            String contactChannelMetadata,
+            UUID assignedStaffId) {
 
         validateCreateDisputeRequest(request);
 
@@ -264,7 +290,12 @@ public class DisputeService {
             dispute.setPaymentRail(paymentRail);
             dispute.setCustomerId(customerId);
             dispute.setAssignedDomain(UserDomain.INTERNAL_CAPI);
-            dispute.setStatus(DisputeStatus.LOGGED);
+            if (assignedStaffId != null) {
+                dispute.setAssignedUserId(assignedStaffId);
+                dispute.setStatus(DisputeStatus.IN_REVIEW);
+            } else {
+                dispute.setStatus(DisputeStatus.LOGGED);
+            }
             dispute.setCategory(request.category());
             dispute.setAmount(amount);
             dispute.setReason(request.reason().trim());
@@ -273,6 +304,10 @@ public class DisputeService {
             dispute.setCreatedAt(Instant.now());
 
             Dispute saved = disputeRepository.save(dispute);
+
+            if (assignedStaffId != null) {
+                productivityService.startWorkSession(saved.getId(), assignedStaffId);
+            }
 
             if (files != null && !files.isEmpty()) {
                 AppUser customerUser = userRepository.findById(customerId).orElse(null);
@@ -349,6 +384,7 @@ public class DisputeService {
             throw ApiException.forbidden("403 Forbidden: External affiliates cannot upload dispute evidence.");
         }
         Dispute dispute = findDisputeAndVerifyBoundary(disputeId, actor, ipAddress, "UPLOAD_ATTACHMENT");
+        ensureStaffAssignedToDispute(dispute, actor, ipAddress, "UPLOAD_ATTACHMENT");
         if (dispute.getStatus().isTerminal()) {
             throw ApiException.conflict("Dispute " + dispute.getDisputeReference() + " is in terminal state (" + dispute.getStatus() + ") and cannot accept file uploads.");
         }
@@ -414,6 +450,7 @@ public class DisputeService {
     @Transactional
     public DisputeDetailDto addNote(UUID disputeId, AddNoteRequest request, AppUserPrincipal actor, String ipAddress) {
         Dispute dispute = findDisputeAndVerifyBoundary(disputeId, actor, ipAddress, "ADD_NOTE");
+        ensureStaffAssignedToDispute(dispute, actor, ipAddress, "ADD_NOTE");
         ensureNonTerminal(dispute);
 
         boolean internalOnly = (actor.getRole() == UserRole.STAFF || actor.getRole() == UserRole.ADMIN) && request.internalOnly();
@@ -473,6 +510,7 @@ public class DisputeService {
         Dispute dispute = findDisputeAndVerifyBoundary(disputeId, actor, ipAddress, "ESCALATE_DISPUTE");
         DisputeStatus previousStatus = dispute.getStatus();
         DisputeTransitionPolicy.validateTransition(previousStatus, DisputeStatus.ESCALATED, actor.getRole());
+        ensureStaffAssignedToDispute(dispute, actor, ipAddress, "ESCALATE_DISPUTE");
 
         productivityService.closeActiveSessionsForDispute(dispute.getId());
 
@@ -539,6 +577,7 @@ public class DisputeService {
         Dispute dispute = findDisputeAndVerifyBoundary(disputeId, actor, ipAddress, "DELEGATE_DISPUTE");
         DisputeStatus previousStatus = dispute.getStatus();
         DisputeTransitionPolicy.validateTransition(previousStatus, DisputeStatus.PENDING_EXTERNAL_REVIEW, actor.getRole());
+        ensureStaffAssignedToDispute(dispute, actor, ipAddress, "DELEGATE_DISPUTE");
 
         productivityService.closeActiveSessionsForDispute(dispute.getId());
 
@@ -616,6 +655,7 @@ public class DisputeService {
         DisputeStatus previousStatus = dispute.getStatus();
         DisputeStatus newStatus = request.status();
         DisputeTransitionPolicy.validateTransition(previousStatus, newStatus, actor.getRole());
+        ensureStaffAssignedToDispute(dispute, actor, ipAddress, "UPDATE_STATUS");
 
         dispute.setStatus(newStatus);
         if (newStatus == DisputeStatus.IN_REVIEW && dispute.getAssignedDomain() != UserDomain.INTERNAL_CAPI) {
@@ -629,8 +669,10 @@ public class DisputeService {
             dispute.setResolvedAt(Instant.now());
             productivityService.closeActiveSessionsForDispute(dispute.getId());
         } else if (newStatus == DisputeStatus.IN_REVIEW && (actor.getRole() == UserRole.STAFF || actor.getRole() == UserRole.ADMIN)) {
-            dispute.setAssignedUserId(actor.getId());
-            productivityService.startWorkSession(dispute.getId(), actor.getId());
+            if (dispute.getAssignedUserId() == null) {
+                dispute.setAssignedUserId(actor.getId());
+            }
+            productivityService.startWorkSession(dispute.getId(), dispute.getAssignedUserId());
         }
 
         dispute = disputeRepository.saveAndFlush(dispute);
@@ -695,15 +737,17 @@ public class DisputeService {
             throw ApiException.badRequest("Disputes cannot be assigned to the CUSTOMER domain.");
         }
 
+        AppUser resolvedAssignee = null;
         if (request.assigneeUserId() != null) {
-            AppUser assignee = userRepository.findById(request.assigneeUserId())
+            resolvedAssignee = userRepository.findById(request.assigneeUserId())
                     .orElseThrow(() -> ApiException.notFound("Assignee user not found."));
-            if (assignee.isLocked()) {
+            if (resolvedAssignee.isLocked()) {
                 throw ApiException.badRequest("Cannot assign dispute to a locked user account.");
             }
-            validateAssigneeCompatibility(assignee, targetDomain);
+            validateAssigneeCompatibility(resolvedAssignee, targetDomain);
         }
 
+        UUID previousAssigneeId = dispute.getAssignedUserId();
         DisputeStatus previousStatus = dispute.getStatus();
         DisputeStatus targetStatus = request.status();
         if (targetStatus == null) {
@@ -732,6 +776,28 @@ public class DisputeService {
         }
 
         dispute = disputeRepository.saveAndFlush(dispute);
+
+        if (resolvedAssignee != null || (request.note() != null && !request.note().isBlank())) {
+            String actionLabel = previousAssigneeId != null && resolvedAssignee != null && !previousAssigneeId.equals(resolvedAssignee.getId())
+                    ? "Reassigned case to "
+                    : "Assigned case to ";
+            String noteBody = resolvedAssignee != null
+                    ? "[ADMIN SUPERVISOR] " + actionLabel + resolvedAssignee.getFullName() + " (" + resolvedAssignee.getEmail() + ")."
+                    : "[ADMIN SUPERVISOR] Updated assignment domain to " + targetDomain.name() + ".";
+            if (request.note() != null && !request.note().isBlank()) {
+                noteBody = noteBody + " Note: " + request.note().trim();
+            }
+            DisputeNote assignNote = new DisputeNote();
+            assignNote.setDisputeId(dispute.getId());
+            assignNote.setAuthorId(admin.getId());
+            assignNote.setAuthorName(admin.getFullName());
+            assignNote.setAuthorRole(admin.getRole());
+            assignNote.setMessage(noteBody);
+            assignNote.setInternalOnly(true);
+            assignNote.setRequiresCustomerReply(false);
+            assignNote.setCreatedAt(Instant.now());
+            noteRepository.save(assignNote);
+        }
 
         log.info("Dispute status transition: disputeId={} fromStatus={} toStatus={} actorId={} role={}",
                 dispute.getId(), previousStatus, dispute.getStatus(), admin.getId(), admin.getRole());
@@ -914,6 +980,38 @@ public class DisputeService {
         }
 
         return dispute;
+    }
+
+    private void ensureStaffAssignedToDispute(Dispute dispute, AppUserPrincipal actor, String ipAddress, String attemptedAction) {
+        if (actor.getRole() != UserRole.STAFF) {
+            return;
+        }
+        UUID assignedId = dispute.getAssignedUserId();
+        if (assignedId == null || !assignedId.equals(actor.getId())) {
+            String reason = assignedId == null
+                    ? "Staff member attempted to work on an unassigned dispute"
+                    : "Staff member attempted to work on a dispute assigned to another investigator";
+            log.warn("Dispute access denied: action={} targetId={} actorId={} role={}",
+                    attemptedAction, dispute.getId(), actor.getId(), actor.getRole());
+            auditService.logEvent(
+                    actor.getId(),
+                    actor.getEmail(),
+                    "HIGH",
+                    "UNAUTHORIZED_ACCESS_ATTEMPT",
+                    "Dispute",
+                    dispute.getId().toString(),
+                    ipAddress,
+                    Map.of(
+                            "severity", "HIGH",
+                            "actorId", actor.getId().toString(),
+                            "action", attemptedAction,
+                            "reason", reason
+                    )
+            );
+            throw ApiException.forbidden(assignedId == null
+                    ? "403 Forbidden: Staff members cannot work on an unassigned dispute. A Supervisor/Admin must assign the case first."
+                    : "403 Forbidden: This dispute is assigned to another staff member. Only the assigned investigator or an Admin Supervisor can work on it.");
+        }
     }
 
     private void ensureNonTerminal(Dispute dispute) {

@@ -218,12 +218,28 @@ class DisputeAuthorizationAndTransitionTest {
     @Test
     void validatesAdminDisputeAssignmentDomainAndRoleCompatibility() throws Exception {
         String customer1Token = loginAndExtractToken("customer@capi.test", "Password123!");
+        String staff1Token = loginAndExtractToken("staff@capi.test", "Password123!");
+        String staff2Token = loginAndExtractToken("staff2@capi.test", "Password123!");
         String adminToken = loginAndExtractToken("admin@capi.test", "Password123!");
 
         AppUser staffUser = appUserRepository.findByEmailIgnoreCase("staff@capi.test").orElseThrow();
+        AppUser staff2User = appUserRepository.findByEmailIgnoreCase("staff2@capi.test").orElseThrow();
         AppUser affiliateUser = appUserRepository.findByEmailIgnoreCase("affiliate@bankserv.test").orElseThrow();
 
         String disputeId = createDispute(customer1Token, "Admin Assign Merchant", "310.00");
+
+        // Unassigned dispute: staff member cannot work on it (403 Forbidden), nor self-assign via admin endpoint
+        mockMvc.perform(post("/api/v1/disputes/" + disputeId + "/notes")
+                        .header("Authorization", "Bearer " + staff1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Attempt on unassigned dispute\",\"internalOnly\":true,\"requiresCustomerReply\":false}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/admin/disputes/" + disputeId + "/assign")
+                        .header("Authorization", "Bearer " + staff1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"assignedDomain\":\"INTERNAL_CAPI\",\"assigneeUserId\":\"" + staffUser.getId() + "\"}"))
+                .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/api/v1/admin/disputes/" + disputeId + "/assign")
                         .header("Authorization", "Bearer " + adminToken)
@@ -249,7 +265,41 @@ class DisputeAuthorizationAndTransitionTest {
                         .content("{\"assignedDomain\":\"INTERNAL_CAPI\",\"assigneeUserId\":\"" + staffUser.getId() + "\",\"status\":\"IN_REVIEW\",\"note\":\"Assigned to investigator\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("IN_REVIEW"))
-                .andExpect(jsonPath("$.assignedDomain").value("INTERNAL_CAPI"));
+                .andExpect(jsonPath("$.assignedDomain").value("INTERNAL_CAPI"))
+                .andExpect(jsonPath("$.assignedUserName").value("Sipho Ndlovu"));
+
+        // Assigned staff1 can work on the case, whereas staff2 is blocked
+        mockMvc.perform(post("/api/v1/disputes/" + disputeId + "/notes")
+                        .header("Authorization", "Bearer " + staff1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Investigating card receipt\",\"internalOnly\":true,\"requiresCustomerReply\":false}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/disputes/" + disputeId + "/notes")
+                        .header("Authorization", "Bearer " + staff2Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Unauthorized staff2 attempt\",\"internalOnly\":true,\"requiresCustomerReply\":false}"))
+                .andExpect(status().isForbidden());
+
+        // Admin reassigns case to staff2 (e.g., staff1 unavailable) -> staff2 can work, staff1 is blocked
+        mockMvc.perform(post("/api/v1/admin/disputes/" + disputeId + "/assign")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"assignedDomain\":\"INTERNAL_CAPI\",\"assigneeUserId\":\"" + staff2User.getId() + "\",\"status\":\"IN_REVIEW\",\"note\":\"Sipho unavailable; reassigned to Zanele\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignedUserName").value("Zanele Mbeki"));
+
+        mockMvc.perform(post("/api/v1/disputes/" + disputeId + "/notes")
+                        .header("Authorization", "Bearer " + staff1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Previous assignee post-handoff note\",\"internalOnly\":true,\"requiresCustomerReply\":false}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/disputes/" + disputeId + "/notes")
+                        .header("Authorization", "Bearer " + staff2Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Zanele picked up case after supervisor reassignment\",\"internalOnly\":true,\"requiresCustomerReply\":false}"))
+                .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/v1/admin/disputes/" + disputeId + "/assign")
                         .header("Authorization", "Bearer " + adminToken)

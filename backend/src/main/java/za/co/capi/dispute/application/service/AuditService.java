@@ -39,7 +39,11 @@ public class AuditService {
             "LOGIN_RATE_LIMITED_IP",
             "OTP_VERIFICATION_FAILED",
             "OTP_VERIFICATION_RATE_LIMITED",
-            "IDEMPOTENCY_DUPLICATE_PREVENTED"
+            "IDEMPOTENCY_DUPLICATE_PREVENTED",
+            "CALLER_KYC_LOOKUP",
+            "CALLER_KYC_LOOKUP_FAILED",
+            "CALLER_KYC_VERIFIED",
+            "CALLER_KYC_VERIFICATION_FAILED"
     );
 
     private final AuditLogRepository auditLogRepository;

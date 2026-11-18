@@ -23,8 +23,10 @@ class DataSeederWithDemoProfileTest {
     @Test
     void registersAndRunsDataSeederWhenDemoProfileIsActive() {
         assertThat(applicationContext.getBeansOfType(DataSeeder.class)).hasSize(1);
-        assertThat(userRepository.count()).isEqualTo(5);
+        assertThat(userRepository.count()).isEqualTo(8);
         assertThat(userRepository.findByEmailIgnoreCase("customer@capi.test")).isPresent();
+        assertThat(userRepository.findByEmailIgnoreCase("customer3@capi.test")).isPresent();
+        assertThat(userRepository.findByEmailIgnoreCase("customer4@capi.test")).isPresent();
     }
 }
 

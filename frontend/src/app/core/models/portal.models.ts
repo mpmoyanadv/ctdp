@@ -29,6 +29,45 @@ export interface UserProfile {
   partnerInstitution: string | null;
   isLocked: boolean;
   lockedReason: string | null;
+  phoneNumber?: string | null;
+}
+
+export interface StaffRoleDefinition {
+  roleCode: string;
+  displayName: string;
+  baseRole: UserRole;
+  defaultDomain: UserDomain;
+  description: string;
+}
+
+export interface UpsertStaffRoleRequest {
+  roleCode?: string;
+  displayName: string;
+  baseRole: UserRole;
+  defaultDomain: UserDomain;
+  description?: string;
+}
+
+export interface CreateStaffUserRequest {
+  fullName: string;
+  email: string;
+  phoneNumber?: string;
+  role: UserRole;
+  userDomain: UserDomain;
+  partnerInstitution?: string;
+  password?: string;
+}
+
+export interface UpdateStaffUserRequest {
+  fullName: string;
+  email: string;
+  phoneNumber?: string;
+  role: UserRole;
+  userDomain: UserDomain;
+  partnerInstitution?: string;
+  isLocked?: boolean;
+  lockedReason?: string;
+  newPassword?: string;
 }
 
 export interface AuthResponse {
@@ -60,6 +99,7 @@ export interface BankTransaction {
   cardLastFour: string;
   location: string;
   transactedAt: string;
+  status?: 'SETTLED' | 'PENDING' | 'REVERSED';
 }
 
 export interface CustomerSummary {
@@ -162,6 +202,11 @@ export interface StaffProductivityRow {
   totalDurationSeconds: number;
   averageDurationSeconds: number;
   distinctDisputesHandled: number;
+  staffRole?: string;
+  staffRoleTitle?: string;
+  currentlyAssignedDisputes?: number;
+  callCentreDisputesLogged?: number;
+  resolvedDisputesCount?: number;
 }
 
 export interface WorkSessionDetail {
@@ -173,6 +218,11 @@ export interface WorkSessionDetail {
   startedAt: string;
   completedAt: string | null;
   totalDurationSeconds: number | null;
+  staffFullName?: string;
+  disputeStatus?: string;
+  assignmentSource?: string;
+  sessionOutcome?: string;
+  elapsedDurationSeconds?: number | null;
 }
 
 export interface ProductivityReport {
@@ -192,6 +242,10 @@ export interface VoiceCallSimulationRequest {
   callerPhoneNumber?: string;
   transactionId?: string | null;
   transactionReference?: string | null;
+  merchantName?: string;
+  paymentRail?: string;
+  location?: string;
+  amount?: number;
   scenario: string;
   category: DisputeCategory;
   callerStatement: string;
@@ -200,12 +254,41 @@ export interface VoiceCallSimulationRequest {
   idempotencyKey?: string;
 }
 
+export interface CustomerKycLookupResponse {
+  customerId: string;
+  fullName: string;
+  email: string;
+  saIdNumber: string;
+  phoneNumber: string;
+  accountNumber: string;
+  hasCreditCardFacility: boolean;
+  hasActiveDebitOrderMandate: boolean;
+  creditBureauProfileSummary: string;
+}
+
 export interface OmnichannelSimulationResponse {
   dispute: DisputeDetail;
   channel: DisputeChannel;
   outboundReply: string;
   channelTranscript: string;
   processedAt: string;
+}
+
+export interface CustomerCallerVerificationRequest {
+  saIdNumber: string;
+  phoneNumber?: string;
+  accountNumber?: string;
+  hasCreditCardFacility?: boolean | null;
+  hasActiveDebitOrderMandate?: boolean | null;
+}
+
+export interface CustomerCallerVerificationResponse {
+  verified: boolean;
+  questionsAnswered: number;
+  verificationSummary: string;
+  creditBureauProfileSummary: string;
+  customer: CustomerSummary;
+  transactions: BankTransaction[];
 }
 
 export interface PageResponse<T> {

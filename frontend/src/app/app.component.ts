@@ -29,9 +29,11 @@ import { AuthService } from './core/services/auth.service';
                 <div class="text-sm font-semibold leading-none">{{ user.fullName }}</div>
                 <div class="text-xs text-blue-200 mt-0.5">{{ user.email }}</div>
               </div>
-              @if (user.role !== 'AFFILIATE') {
-                <a routerLink="/simulator" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold transition">
-                  SMS / Call Simulator
+              @if (user.role === 'CUSTOMER') {
+                <a id="nav-customer-disputes-link"
+                   routerLink="/customer/disputes"
+                   class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold transition">
+                  My Disputed Transactions
                 </a>
               }
               <a [routerLink]="homeLink()" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold transition">
