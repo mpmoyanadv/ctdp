@@ -10,8 +10,8 @@ import { DisputeSummary } from '../../core/models/portal.models';
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      <div class="bg-white rounded-2xl shadow-sm border border-purple-200 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="w-full max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
+      <div class="bg-white rounded-2xl shadow-sm border border-purple-200 p-4 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-100 text-purple-900 text-xs font-bold mb-2">
             External Affiliate Portal &bull; {{ auth.currentUser()?.partnerInstitution || auth.currentUser()?.userDomain }}
@@ -36,38 +36,38 @@ import { DisputeSummary } from '../../core/models/portal.models';
             <table class="w-full text-sm text-left">
               <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
                 <tr>
-                  <th class="px-6 py-3">Dispute Ref</th>
-                  <th class="px-6 py-3">Masked Customer Identity</th>
-                  <th class="px-6 py-3">Masked Account &amp; Contact</th>
-                  <th class="px-6 py-3">Rail &amp; Amount</th>
-                  <th class="px-6 py-3">Status</th>
-                  <th class="px-6 py-3 text-right">Action</th>
+                  <th class="px-3 sm:px-4 py-3">Dispute Ref</th>
+                  <th class="px-3 sm:px-4 py-3">Masked Customer Identity</th>
+                  <th class="px-3 sm:px-4 py-3">Masked Account &amp; Contact</th>
+                  <th class="px-3 sm:px-4 py-3">Rail &amp; Amount</th>
+                  <th class="px-3 sm:px-4 py-3">Status</th>
+                  <th class="px-3 sm:px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
                 @for (d of disputes; track d.id) {
                   <tr class="hover:bg-slate-50/80 transition">
-                    <td class="px-6 py-4 font-mono font-bold text-slate-900">{{ d.disputeReference }}</td>
-                    <td class="px-6 py-4">
+                    <td class="px-3 sm:px-4 py-3 font-mono font-bold text-slate-900 whitespace-nowrap">{{ d.disputeReference }}</td>
+                    <td class="px-3 sm:px-4 py-3">
                       <div class="font-semibold text-slate-900">{{ d.customer.fullName }}</div>
                       <div class="font-mono text-xs text-purple-800 font-semibold">ID: {{ d.customer.saIdNumber }}</div>
                     </td>
-                    <td class="px-6 py-4 font-mono text-xs text-slate-600">
+                    <td class="px-3 sm:px-4 py-3 font-mono text-xs text-slate-600">
                       <div>Acct: {{ d.customer.accountNumber }}</div>
                       <div>Tel: {{ d.customer.phoneNumber }}</div>
                     </td>
-                    <td class="px-6 py-4">
-                      <div class="font-bold text-slate-900">R {{ d.amount | number:'1.2-2' }}</div>
+                    <td class="px-3 sm:px-4 py-3">
+                      <div class="font-bold text-slate-900 whitespace-nowrap">R {{ d.amount | number:'1.2-2' }}</div>
                       <div class="text-xs text-slate-500">{{ d.merchantName }} ({{ d.paymentRail }})</div>
                     </td>
-                    <td class="px-6 py-4">
+                    <td class="px-3 sm:px-4 py-3">
                       <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-900">
                         {{ d.status }}
                       </span>
                     </td>
-                    <td class="px-6 py-4 text-right">
+                    <td class="px-3 sm:px-4 py-3 text-right">
                       <a [routerLink]="['/disputes', d.id]"
-                         class="px-3.5 py-1.5 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition inline-block">
+                         class="px-3.5 py-1.5 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition inline-block whitespace-nowrap">
                         Inspect &amp; Resolve
                       </a>
                     </td>

@@ -11,8 +11,8 @@ import { DisputeSummary } from '../../core/models/portal.models';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="w-full max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span class="text-xs font-bold uppercase tracking-wider text-capi-blue">Internal Capi Operations</span>
           <h1 class="text-2xl font-bold text-slate-900 mt-0.5">Dispute Investigator Workbench</h1>
@@ -80,39 +80,39 @@ import { DisputeSummary } from '../../core/models/portal.models';
           <table class="w-full text-sm text-left">
             <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
               <tr>
-                <th class="px-5 py-3">Reference</th>
-                <th class="px-5 py-3">Customer</th>
-                <th class="px-5 py-3">Merchant &amp; Rail</th>
-                <th class="px-5 py-3">Amount</th>
-                <th class="px-5 py-3">Domain / Assignee</th>
-                <th class="px-5 py-3">Status</th>
-                <th class="px-5 py-3 text-right">Actions</th>
+                <th class="px-3 sm:px-4 py-3">Reference</th>
+                <th class="px-3 sm:px-4 py-3">Customer</th>
+                <th class="px-3 sm:px-4 py-3">Merchant &amp; Rail</th>
+                <th class="px-3 sm:px-4 py-3">Amount</th>
+                <th class="px-3 sm:px-4 py-3">Domain / Assignee</th>
+                <th class="px-3 sm:px-4 py-3">Status</th>
+                <th class="px-3 sm:px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
               @for (d of filteredDisputes(); track d.id) {
                 <tr class="hover:bg-slate-50/80 transition">
-                  <td class="px-5 py-4">
-                    <div class="font-mono font-bold text-slate-900">{{ d.disputeReference }}</div>
+                  <td class="px-3 sm:px-4 py-3">
+                    <div class="font-mono font-bold text-slate-900 whitespace-nowrap">{{ d.disputeReference }}</div>
                     @if (d.originalDisputeReference) {
                       <div class="text-xs text-indigo-700 font-semibold mt-0.5">
                         Linked: {{ d.originalDisputeReference }}
                       </div>
                     }
                   </td>
-                  <td class="px-5 py-4">
+                  <td class="px-3 sm:px-4 py-3">
                     <div class="font-medium text-slate-900">{{ d.customer.fullName }}</div>
                     <div class="text-xs text-slate-500">{{ d.customer.email }}</div>
                     @if (d.customer.saIdNumber) {
                       <div class="text-[11px] font-mono text-slate-400">ID: {{ d.customer.saIdNumber }}</div>
                     }
                   </td>
-                  <td class="px-5 py-4">
+                  <td class="px-3 sm:px-4 py-3">
                     <div class="font-medium text-slate-800">{{ d.merchantName }}</div>
                     <div class="text-xs text-slate-500">{{ d.paymentRail }} &bull; {{ d.category }} &bull; {{ d.sourceChannel || 'WEB_PORTAL' }}</div>
                   </td>
-                  <td class="px-5 py-4 font-bold text-slate-900">R {{ d.amount | number:'1.2-2' }}</td>
-                  <td class="px-5 py-4 text-xs">
+                  <td class="px-3 sm:px-4 py-3 font-bold text-slate-900 whitespace-nowrap">R {{ d.amount | number:'1.2-2' }}</td>
+                  <td class="px-3 sm:px-4 py-3 text-xs">
                     <div class="font-semibold text-slate-700">{{ d.assignedDomain }}</div>
                     @if (isAssignedToCurrentUser(d)) {
                       <span class="inline-block mt-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
@@ -128,10 +128,10 @@ import { DisputeSummary } from '../../core/models/portal.models';
                       </span>
                     }
                   </td>
-                  <td class="px-5 py-4">
+                  <td class="px-3 sm:px-4 py-3">
                     <span [class]="statusBadge(d.status)">{{ d.status }}</span>
                   </td>
-                  <td class="px-5 py-4 text-right whitespace-nowrap">
+                  <td class="px-3 sm:px-4 py-3 text-right whitespace-nowrap">
                     @if (isAssignedToCurrentUser(d)) {
                       <a [routerLink]="['/disputes', d.id]"
                          class="px-3.5 py-1.5 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition inline-block">
@@ -165,7 +165,6 @@ export class StaffDashboardComponent implements OnInit {
     { key: 'LOGGED', label: 'Open (LOGGED)' },
     { key: 'IN_REVIEW', label: 'In Review' },
     { key: 'PENDING_CUSTOMER_ACTION', label: 'Pending Customer' },
-    { key: 'PENDING_EXTERNAL_REVIEW', label: 'External Partner' },
     { key: 'ESCALATED', label: 'Escalated' }
   ];
 

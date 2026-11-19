@@ -9,14 +9,14 @@ import { AuthService } from '../../core/services/auth.service';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="max-w-lg mx-auto px-4 py-12">
+    <div class="max-w-lg mx-auto px-3 sm:px-4 py-6 sm:py-12">
       <div class="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-        <div class="bg-capi-blue text-white px-7 py-6">
+        <div class="bg-capi-blue text-white px-5 sm:px-7 py-5 sm:py-6">
           <p class="text-xs uppercase tracking-wider text-blue-200 font-semibold mb-1">Identity Verification</p>
           <h1 class="text-xl font-bold">Verify 6-Digit OTP &amp; Unlock Account</h1>
         </div>
 
-        <div class="p-7">
+        <div class="p-5 sm:p-7">
           @if (unlockedSuccess) {
             <div id="unlock-success-banner" class="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 mb-5">
               <h2 class="font-bold text-base mb-1">Account Unlocked &amp; Password Updated</h2>

@@ -17,18 +17,18 @@ import {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div class="w-full max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
       <!-- 403 FORBIDDEN IDOR BOUNDARY ALERT -->
       @if (forbiddenError) {
         <div id="forbidden-access-banner" class="bg-white rounded-2xl shadow-xl border-2 border-red-600 overflow-hidden">
-          <div class="bg-red-700 text-white px-7 py-5 flex items-center justify-between">
+          <div class="bg-red-700 text-white px-5 sm:px-7 py-4 sm:py-5 flex flex-wrap items-center justify-between gap-2">
             <div>
               <span class="text-xs font-bold uppercase tracking-wider text-red-200">Security Boundary Violation Blocked</span>
               <h1 class="text-2xl font-bold mt-0.5">403 Forbidden &mdash; Access Denied</h1>
             </div>
             <span class="px-3 py-1 rounded-full bg-red-900 text-red-100 text-xs font-mono font-bold">HTTP 403</span>
           </div>
-          <div class="p-7 space-y-4">
+          <div class="p-5 sm:p-7 space-y-4">
             <p class="text-base text-slate-800 font-semibold">
               {{ errorMessage }}
             </p>
@@ -48,15 +48,15 @@ import {
       } @else if (dispute) {
         <div class="space-y-6">
           <!-- Top Breadcrumb & Status Header -->
-          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <div class="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                  <a [routerLink]="[auth.getHomeRouteForRole(auth.currentUser()?.role)]" class="text-capi-blue font-semibold hover:underline">
+                <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-1">
+                  <a [routerLink]="[auth.getHomeRouteForRole(auth.currentUser()?.role)]" class="text-capi-blue font-semibold hover:underline whitespace-nowrap">
                     &larr; Back to Dashboard
                   </a>
                   <span>&bull;</span>
-                  <span class="font-mono">{{ dispute.id }}</span>
+                  <span class="font-mono break-all">{{ dispute.id }}</span>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
                   <h1 class="text-2xl font-bold text-slate-900 font-mono">{{ dispute.disputeReference }}</h1>
@@ -71,7 +71,7 @@ import {
                   <strong>{{ dispute.merchantName }}</strong> &bull; Rail: <strong>{{ dispute.paymentRail }}</strong> &bull; Category: <strong>{{ dispute.category }}</strong> &bull; Channel: <strong>{{ dispute.sourceChannel || 'WEB_PORTAL' }}</strong>
                 </p>
                 @if (dispute.contactChannelMetadata) {
-                  <p class="text-xs font-mono text-slate-500 mt-0.5">{{ dispute.contactChannelMetadata }}</p>
+                  <p class="text-xs font-mono text-slate-500 mt-0.5 break-words">{{ dispute.contactChannelMetadata }}</p>
                 }
               </div>
 
@@ -186,7 +186,7 @@ import {
             <!-- Left Column: Statement, Notes & Evidence -->
             <div class="lg:col-span-2 space-y-6">
               <!-- Statement of Dispute -->
-              <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
                 <h2 class="text-base font-bold text-slate-900 mb-2">Customer Dispute Statement</h2>
                 <p class="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
                   {{ dispute.reason }}
@@ -199,7 +199,7 @@ import {
               </div>
 
               <!-- Investigation Notes & Customer Communication -->
-              <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+              <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-4">
                 <div class="flex items-center justify-between">
                   <h2 class="text-base font-bold text-slate-900">Case Notes &amp; Evidence Requests ({{ dispute.notes.length }})</h2>
                   @if (dispute.terminal) {
@@ -293,7 +293,7 @@ import {
               </div>
 
               <!-- Supporting Attachments & SHA-256 Checksums -->
-              <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+              <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-4">
                 <div class="flex items-center justify-between">
                   <h2 class="text-base font-bold text-slate-900">
                     Evidence Attachments ({{ dispute.attachments.length }} / 5)
@@ -354,8 +354,8 @@ import {
             <!-- Right Column: Customer Identity (with PII Masking) & Investigator Controls -->
             <div class="space-y-6">
               <!-- Customer Identity Card -->
-              <div id="customer-pii-card" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3">
-                <div class="flex items-center justify-between">
+              <div id="customer-pii-card" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
                   <h2 class="text-base font-bold text-slate-900">Customer Profile</h2>
                   @if (dispute.customer.piiMasked) {
                     <span id="pii-masked-badge" class="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-900 text-[11px] font-bold">
@@ -365,25 +365,25 @@ import {
                 </div>
 
                 <div class="text-sm space-y-2 pt-2 border-t border-slate-100">
-                  <div class="flex justify-between">
+                  <div class="flex justify-between gap-2 flex-wrap">
                     <span class="text-slate-500">Name:</span>
-                    <span class="font-semibold text-slate-900">{{ dispute.customer.fullName }}</span>
+                    <span class="font-semibold text-slate-900 break-words text-right">{{ dispute.customer.fullName }}</span>
                   </div>
-                  <div class="flex justify-between">
+                  <div class="flex justify-between gap-2 flex-wrap">
                     <span class="text-slate-500">SA ID:</span>
-                    <span id="customer-sa-id" class="font-mono font-bold text-slate-900">ID: {{ dispute.customer.saIdNumber }}</span>
+                    <span id="customer-sa-id" class="font-mono font-bold text-slate-900 break-all text-right">ID: {{ dispute.customer.saIdNumber }}</span>
                   </div>
-                  <div class="flex justify-between">
+                  <div class="flex justify-between gap-2 flex-wrap">
                     <span class="text-slate-500">Phone:</span>
-                    <span class="font-mono text-slate-800">{{ dispute.customer.phoneNumber }}</span>
+                    <span class="font-mono text-slate-800 break-all text-right">{{ dispute.customer.phoneNumber }}</span>
                   </div>
-                  <div class="flex justify-between">
+                  <div class="flex justify-between gap-2 flex-wrap">
                     <span class="text-slate-500">Account:</span>
-                    <span class="font-mono text-slate-800">{{ dispute.customer.accountNumber }}</span>
+                    <span class="font-mono text-slate-800 break-all text-right">{{ dispute.customer.accountNumber }}</span>
                   </div>
-                  <div class="flex justify-between">
+                  <div class="flex justify-between gap-2 flex-wrap">
                     <span class="text-slate-500">Email:</span>
-                    <span class="font-mono text-xs text-slate-700">{{ dispute.customer.email }}</span>
+                    <span class="font-mono text-xs text-slate-700 break-all text-right">{{ dispute.customer.email }}</span>
                   </div>
                 </div>
               </div>
@@ -396,14 +396,14 @@ import {
                     {{ dispute.assignedUserName ? 'Assigned to ' + dispute.assignedUserName : 'Unassigned — Awaiting Supervisor Assignment' }}
                   </p>
                   <p class="text-xs text-amber-900 leading-relaxed">
-                    Staff members cannot work on unassigned disputes or cases assigned to another investigator. A Supervisor/Admin must assign or reassign this ticket to you before you can add notes, delegate, or update status.
+                    Staff members cannot work on unassigned disputes or cases assigned to another investigator. A Supervisor/Admin must assign or reassign this ticket to you before you can add notes, escalate, or update status.
                   </p>
                 </div>
               }
 
               <!-- Supervisor-Only Staff Assignment / Reassignment Card (ADMIN) -->
               @if (!dispute.terminal && auth.currentUser()?.role === 'ADMIN') {
-                <div id="admin-assign-staff-card" class="bg-white rounded-2xl shadow-sm border-2 border-capi-blue/30 p-6 space-y-3">
+                <div id="admin-assign-staff-card" class="bg-white rounded-2xl shadow-sm border-2 border-capi-blue/30 p-4 sm:p-6 space-y-3">
                   <h2 class="text-base font-bold text-slate-900">Supervisor Staff Assignment</h2>
                   <p class="text-xs text-slate-500">
                     Current Assignee: <strong>{{ dispute.assignedUserName || 'Unassigned' }}</strong>
@@ -433,7 +433,7 @@ import {
 
               <!-- Investigator / Supervisor / Affiliate Workflow Controls -->
               @if (!dispute.terminal && auth.currentUser()?.role !== 'CUSTOMER' && (auth.currentUser()?.role !== 'STAFF' || canStaffWorkOnDispute())) {
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-4">
                   <h2 class="text-base font-bold text-slate-900">Investigation Actions</h2>
 
                   @if (isStaffOrAdmin()) {
@@ -446,27 +446,6 @@ import {
                     >
                       Escalate to Supervisor
                     </button>
-
-                    <div class="pt-3 border-t border-slate-100 space-y-2">
-                      <label class="block text-xs font-bold uppercase text-slate-500">External Partner Delegation</label>
-                      <div class="grid grid-cols-2 gap-2">
-                        <button
-                          id="delegate-bankserv-btn"
-                          type="button"
-                          (click)="delegate('PARTNER_BANKSERV')"
-                          class="py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition"
-                        >
-                          Assign PARTNER_BANKSERV
-                        </button>
-                        <button
-                          type="button"
-                          (click)="delegate('PARTNER_MERCHANT')"
-                          class="py-2 px-3 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold transition"
-                        >
-                          Assign PARTNER_MERCHANT
-                        </button>
-                      </div>
-                    </div>
                   }
 
                   <!-- Status Decision Controls -->
@@ -482,7 +461,6 @@ import {
                     >
                       <option value="IN_REVIEW">IN_REVIEW</option>
                       <option value="PENDING_CUSTOMER_ACTION">PENDING_CUSTOMER_ACTION</option>
-                      <option value="PENDING_EXTERNAL_REVIEW">PENDING_EXTERNAL_REVIEW</option>
                       <option value="RESOLVED">RESOLVED (Terminal)</option>
                       <option value="REFUNDED">REFUNDED (Terminal)</option>
                       <option value="REJECTED">REJECTED (Terminal)</option>
@@ -512,7 +490,7 @@ import {
 
               <!-- Customer Escalation Option -->
               @if (!dispute.terminal && auth.currentUser()?.role === 'CUSTOMER' && dispute.status !== 'ESCALATED') {
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-3">
                   <h3 class="text-sm font-bold text-slate-900">Need Supervisor Review?</h3>
                   <p class="text-xs text-slate-500">You may escalate an active dispute to a Capi Supervisor at any time.</p>
                   <button
@@ -564,7 +542,9 @@ export class DisputeDetailComponent implements OnInit {
     if (this.auth.currentUser()?.role === 'ADMIN') {
       this.api.getAdminUsers().subscribe({
         next: (users) => {
-          this.staffUsers = users.filter((u) => u.role === 'STAFF' && !u.isLocked);
+          this.staffUsers = users.filter(
+            (u) => (u.role === 'STAFF' || u.role === 'ADMIN') && u.userDomain === 'INTERNAL_CAPI' && !u.isLocked
+          );
         },
         error: () => {}
       });
@@ -678,28 +658,6 @@ export class DisputeDetailComponent implements OnInit {
         error: (err) => {
           this.busy = false;
           this.actionError = err.error?.message || 'Escalation failed.';
-        }
-      });
-  }
-
-  delegate(domain: 'PARTNER_BANKSERV' | 'PARTNER_MERCHANT'): void {
-    if (!this.dispute) return;
-    this.busy = true;
-    this.api
-      .delegateDispute(
-        this.dispute.id,
-        domain,
-        `Delegated to external partner domain ${domain} for settlement verification.`
-      )
-      .subscribe({
-        next: (d) => {
-          this.dispute = d;
-          this.busy = false;
-          this.actionFeedback = `Dispute delegated to ${domain} (Status: ${d.status}).`;
-        },
-        error: (err) => {
-          this.busy = false;
-          this.actionError = err.error?.message || 'Delegation failed.';
         }
       });
   }

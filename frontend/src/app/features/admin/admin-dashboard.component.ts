@@ -18,14 +18,14 @@ import {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+    <div class="w-full max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
       <!-- Supervisor Header -->
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <span class="text-xs font-bold uppercase tracking-wider text-capi-red">Supervisor &amp; Governance Command Center</span>
           <h1 class="text-2xl font-bold text-slate-900 mt-0.5">Capi System Administration Portal</h1>
           <p class="text-sm text-slate-500 mt-1">
-            Review escalated cases, delegate cross-domain disputes, audit IDOR security boundary probes, export immutable CSV logs, and monitor investigator productivity.
+            Review escalated cases, assign and reassign staff investigators, audit security boundary events, export immutable CSV logs, and monitor investigator productivity.
           </p>
         </div>
 
@@ -80,10 +80,10 @@ import {
       <!-- TAB 1: DISPUTES & ESCALATIONS -->
       @if (activeTab === 'DISPUTES') {
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
               <h2 class="text-lg font-bold text-slate-900">Supervisor Case Queue &amp; Staff Assignment</h2>
-              <p class="text-xs text-slate-500">Assign open disputes to internal investigators, reassign unavailable staff, delegate externally, or manage escalations.</p>
+              <p class="text-xs text-slate-500">Assign open disputes to internal investigators, reassign unavailable staff, and manage escalations.</p>
             </div>
             <div class="flex flex-wrap items-center gap-3">
               <div class="relative w-full sm:w-80">
@@ -115,19 +115,19 @@ import {
             <table class="w-full text-sm text-left">
               <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
                 <tr>
-                  <th class="px-5 py-3">Reference</th>
-                  <th class="px-5 py-3">Customer</th>
-                  <th class="px-5 py-3">Merchant &amp; Rail</th>
-                  <th class="px-5 py-3">Amount</th>
-                  <th class="px-5 py-3">Assigned Investigator</th>
-                  <th class="px-5 py-3">Status</th>
-                  <th class="px-5 py-3 text-right">Supervisor Actions &amp; Reassignment</th>
+                  <th class="px-3 sm:px-4 py-2.5 sm:py-3">Reference</th>
+                  <th class="px-3 sm:px-4 py-2.5 sm:py-3">Customer</th>
+                  <th class="px-3 sm:px-4 py-2.5 sm:py-3">Merchant &amp; Rail</th>
+                  <th class="px-3 sm:px-4 py-2.5 sm:py-3">Amount</th>
+                  <th class="px-3 sm:px-4 py-2.5 sm:py-3">Assigned Investigator</th>
+                  <th class="px-3 sm:px-4 py-2.5 sm:py-3">Status</th>
+                  <th class="px-3 sm:px-4 py-2.5 sm:py-3 text-right">Supervisor Actions &amp; Reassignment</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
                 @for (d of filteredDisputes(); track d.id) {
                   <tr [class]="d.status === 'ESCALATED' ? 'bg-orange-50/60 hover:bg-orange-50' : 'hover:bg-slate-50/80'">
-                    <td class="px-5 py-4">
+                    <td class="px-3 sm:px-4 py-2.5 sm:py-3">
                       <div class="font-mono font-bold text-slate-900">{{ d.disputeReference }}</div>
                       @if (d.originalDisputeReference) {
                         <div class="text-xs text-indigo-700 font-semibold mt-0.5">
@@ -135,19 +135,19 @@ import {
                         </div>
                       }
                     </td>
-                    <td class="px-5 py-4">
+                    <td class="px-3 sm:px-4 py-2.5 sm:py-3">
                       <div class="font-medium text-slate-900">{{ d.customer.fullName }}</div>
                       <div class="text-xs text-slate-500">{{ d.customer.email }}</div>
                       @if (d.customer.saIdNumber) {
                         <div class="text-[11px] font-mono text-slate-400">ID: {{ d.customer.saIdNumber }}</div>
                       }
                     </td>
-                    <td class="px-5 py-4">
+                    <td class="px-3 sm:px-4 py-2.5 sm:py-3">
                       <div class="font-medium text-slate-800">{{ d.merchantName }}</div>
                       <div class="text-xs text-slate-500">{{ d.paymentRail }} &bull; {{ d.category }}</div>
                     </td>
-                    <td class="px-5 py-4 font-bold text-slate-900">R {{ d.amount | number:'1.2-2' }}</td>
-                    <td class="px-5 py-4 text-xs">
+                    <td class="px-3 sm:px-4 py-2.5 sm:py-3 font-bold text-slate-900 whitespace-nowrap">R {{ d.amount | number:'1.2-2' }}</td>
+                    <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-xs">
                       <div class="font-semibold text-slate-700">{{ d.assignedDomain }}</div>
                       @if (d.assignedUserName) {
                         <span class="inline-block mt-1 px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[11px] font-bold">
@@ -159,52 +159,31 @@ import {
                         </span>
                       }
                     </td>
-                    <td class="px-5 py-4">
+                    <td class="px-3 sm:px-4 py-2.5 sm:py-3">
                       <span [class]="statusBadge(d.status)">{{ d.status }}</span>
                     </td>
-                    <td class="px-5 py-4 text-right whitespace-nowrap">
+                    <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-right min-w-[220px]">
                       <div class="flex flex-wrap items-center justify-end gap-1.5">
                         @if (!d.terminal) {
-                          <div class="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-1">
+                          <div class="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-1 max-w-full">
                             <select
                               [name]="'assignStaff-' + d.id"
                               [(ngModel)]="selectedStaffByDispute[d.id]"
-                              class="px-2 py-1 rounded border border-slate-300 text-xs bg-white text-slate-800"
+                              class="px-2 py-1 rounded border border-slate-300 text-xs bg-white text-slate-800 max-w-[170px] sm:max-w-[210px] truncate"
                             >
                               <option value="">Select Staff...</option>
                               @for (staff of staffUsers(); track staff.id) {
-                                <option [value]="staff.id">{{ staff.fullName }} ({{ staff.partnerInstitution || staff.role }} &bull; {{ staff.email }})</option>
+                                <option [value]="staff.id">{{ staff.fullName }} ({{ staff.partnerInstitution || staff.role }})</option>
                               }
                             </select>
                             <button
                               type="button"
                               (click)="assignToStaff(d)"
-                              class="px-2.5 py-1 rounded bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition"
+                              class="px-2.5 py-1 rounded bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition whitespace-nowrap"
                             >
                               {{ d.assignedUserId ? 'Reassign' : 'Assign' }}
                             </button>
                           </div>
-                          <button
-                            type="button"
-                            (click)="assignBankserv(d)"
-                            class="px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition"
-                          >
-                            Bankserv
-                          </button>
-                          <button
-                            type="button"
-                            (click)="quickResolve(d)"
-                            class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition"
-                          >
-                            Resolve
-                          </button>
-                          <button
-                            type="button"
-                            (click)="quickReject(d)"
-                            class="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition"
-                          >
-                            Reject
-                          </button>
                         }
                         <a [routerLink]="['/disputes', d.id]"
                            class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition inline-block">
@@ -223,7 +202,7 @@ import {
       <!-- TAB 2: AUDIT MANAGEMENT -->
       @if (activeTab === 'AUDIT') {
         <div id="audit-management-section" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-6 py-4 border-b border-slate-100 space-y-4">
+          <div class="px-4 sm:px-6 py-4 border-b border-slate-100 space-y-4">
             <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
               <div>
                 <h2 class="text-lg font-bold text-slate-900">Immutable Banking Security &amp; Operational Audit Trail</h2>
@@ -236,7 +215,7 @@ import {
                   id="audit-event-filter"
                   [(ngModel)]="auditFilter"
                   (change)="loadAuditLogs()"
-                  class="px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white"
+                  class="px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white w-full sm:w-auto max-w-full truncate"
                 >
                   <option value="">All Event Types</option>
                   <optgroup label="Call Centre KYC &amp; Identity Verification">
@@ -262,7 +241,6 @@ import {
                     <option value="DISPUTE_STATUS_CHANGED">DISPUTE_STATUS_CHANGED</option>
                     <option value="DISPUTE_NOTE_ADDED">DISPUTE_NOTE_ADDED</option>
                     <option value="DISPUTE_ESCALATED">DISPUTE_ESCALATED</option>
-                    <option value="DISPUTE_DELEGATED_EXTERNAL">DISPUTE_DELEGATED_EXTERNAL</option>
                     <option value="DISPUTE_REOPENED_LINKED">DISPUTE_REOPENED_LINKED</option>
                     <option value="ATTACHMENT_UPLOADED">ATTACHMENT_UPLOADED</option>
                     <option value="IDEMPOTENCY_DUPLICATE_PREVENTED">IDEMPOTENCY_DUPLICATE_PREVENTED</option>
@@ -338,34 +316,34 @@ import {
             <table class="w-full text-xs text-left">
               <thead class="bg-slate-50 uppercase text-slate-500 border-b border-slate-200">
                 <tr>
-                  <th class="px-4 py-3">ID</th>
-                  <th class="px-4 py-3">Timestamp</th>
-                  <th class="px-4 py-3">Severity</th>
-                  <th class="px-4 py-3">Event Type</th>
-                  <th class="px-4 py-3">Actor</th>
-                  <th class="px-4 py-3">Entity &amp; Target ID</th>
-                  <th class="px-4 py-3">IP Address</th>
-                  <th class="px-4 py-3">Investigation Metadata</th>
+                  <th class="px-3 py-2.5">ID</th>
+                  <th class="px-3 py-2.5">Timestamp</th>
+                  <th class="px-3 py-2.5">Severity</th>
+                  <th class="px-3 py-2.5">Event Type</th>
+                  <th class="px-3 py-2.5">Actor</th>
+                  <th class="px-3 py-2.5">Entity &amp; Target ID</th>
+                  <th class="px-3 py-2.5">IP Address</th>
+                  <th class="px-3 py-2.5">Investigation Metadata</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
                 @for (log of filteredAuditLogs(); track log.id) {
                   <tr [class]="auditRowClass(log)">
-                    <td class="px-4 py-3 font-mono font-bold text-slate-700">#{{ log.id }}</td>
-                    <td class="px-4 py-3 text-slate-500 whitespace-nowrap">{{ log.timestamp | date:'medium' }}</td>
-                    <td class="px-4 py-3">
+                    <td class="px-3 py-2.5 font-mono font-bold text-slate-700 whitespace-nowrap">#{{ log.id }}</td>
+                    <td class="px-3 py-2.5 text-slate-500 whitespace-nowrap">{{ log.timestamp | date:'medium' }}</td>
+                    <td class="px-3 py-2.5">
                       <span [class]="severityBadge(log.severity)">{{ log.severity }}</span>
                     </td>
-                    <td class="px-4 py-3 font-mono font-bold text-slate-900">{{ log.eventType }}</td>
-                    <td class="px-4 py-3">
-                      <div class="font-medium text-slate-900">{{ log.actorEmail || 'N/A' }}</div>
-                      <div class="font-mono text-[11px] text-slate-500">{{ log.actorId }}</div>
+                    <td class="px-3 py-2.5 font-mono font-bold text-slate-900 break-words">{{ log.eventType }}</td>
+                    <td class="px-3 py-2.5">
+                      <div class="font-medium text-slate-900 break-all">{{ log.actorEmail || 'N/A' }}</div>
+                      <div class="font-mono text-[11px] text-slate-500 break-all">{{ log.actorId }}</div>
                     </td>
-                    <td class="px-4 py-3 font-mono text-slate-700">
+                    <td class="px-3 py-2.5 font-mono text-slate-700 break-all">
                       {{ log.entityName }}: {{ log.entityId }}
                     </td>
-                    <td class="px-4 py-3 font-mono font-semibold text-slate-800">{{ log.ipAddress }}</td>
-                    <td class="px-4 py-3 font-mono text-[11px] text-slate-700 max-w-md break-words whitespace-pre-wrap">
+                    <td class="px-3 py-2.5 font-mono font-semibold text-slate-800 whitespace-nowrap">{{ log.ipAddress }}</td>
+                    <td class="px-3 py-2.5 font-mono text-[11px] text-slate-700 max-w-sm break-words whitespace-pre-wrap">
                       {{ log.metadata }}
                     </td>
                   </tr>
@@ -386,11 +364,11 @@ import {
       @if (activeTab === 'PRODUCTIVITY') {
         <div id="productivity-report-section" class="space-y-6">
           <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h2 class="text-lg font-bold text-slate-900">Staff Investigator Productivity &amp; Turnaround Time Report</h2>
                 <p class="text-xs text-slate-500">
-                  Calculated automatically from StaffWorkSession timers started on Supervisor case assignment, reassignment, or Call Centre assisted intake auto-assignment (IN_REVIEW) through resolution, refund, rejection, escalation, external partner delegation, or staff reassignment.
+                  Calculated automatically from StaffWorkSession timers started on Supervisor case assignment, reassignment, or Call Centre assisted intake auto-assignment (IN_REVIEW) through resolution, refund, rejection, escalation, or staff reassignment.
                 </p>
               </div>
               <button type="button" (click)="loadProductivity()" class="text-xs text-capi-blue font-semibold hover:underline whitespace-nowrap">
@@ -403,21 +381,21 @@ import {
                 <table class="w-full text-sm text-left">
                   <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
                     <tr>
-                      <th class="px-5 py-3">Investigator &amp; Role</th>
-                      <th class="px-5 py-3">Email</th>
-                      <th class="px-5 py-3">Assigned (Active)</th>
-                      <th class="px-5 py-3">Call Centre Auto-Assigned</th>
-                      <th class="px-5 py-3">Resolved / Closed</th>
-                      <th class="px-5 py-3">Distinct Disputes</th>
-                      <th class="px-5 py-3">Work Sessions</th>
-                      <th class="px-5 py-3">Total Time Tracked</th>
-                      <th class="px-5 py-3">Avg Turnaround Time</th>
+                      <th class="px-3 sm:px-4 py-2.5 sm:py-3">Investigator &amp; Role</th>
+                      <th class="px-3 sm:px-4 py-2.5 sm:py-3">Email</th>
+                      <th class="px-3 sm:px-4 py-2.5 sm:py-3">Assigned (Active)</th>
+                      <th class="px-3 sm:px-4 py-2.5 sm:py-3">Call Centre Auto-Assigned</th>
+                      <th class="px-3 sm:px-4 py-2.5 sm:py-3">Resolved / Closed</th>
+                      <th class="px-3 sm:px-4 py-2.5 sm:py-3">Distinct Disputes</th>
+                      <th class="px-3 sm:px-4 py-2.5 sm:py-3">Work Sessions</th>
+                      <th class="px-3 sm:px-4 py-2.5 sm:py-3">Total Time Tracked</th>
+                      <th class="px-3 sm:px-4 py-2.5 sm:py-3">Avg Turnaround Time</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-slate-100">
                     @for (row of productivity.staffSummaries; track row.staffId) {
                       <tr class="hover:bg-slate-50">
-                        <td class="px-5 py-4">
+                        <td class="px-3 sm:px-4 py-2.5 sm:py-3">
                           <div class="font-bold text-slate-900">{{ row.staffFullName }}</div>
                           <div class="flex flex-wrap items-center gap-1.5 mt-1">
                             <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-capi-blue border border-blue-200">
@@ -428,17 +406,17 @@ import {
                             }
                           </div>
                         </td>
-                        <td class="px-5 py-4 text-slate-600 text-xs font-mono">{{ row.staffEmail }}</td>
-                        <td class="px-5 py-4 font-bold text-blue-700">{{ row.currentlyAssignedDisputes ?? row.activeSessions }}</td>
-                        <td class="px-5 py-4 font-semibold text-indigo-700">{{ row.callCentreDisputesLogged ?? 0 }}</td>
-                        <td class="px-5 py-4 font-bold text-emerald-700">{{ row.resolvedDisputesCount ?? 0 }}</td>
-                        <td class="px-5 py-4 font-semibold text-slate-800">{{ row.distinctDisputesHandled }}</td>
-                        <td class="px-5 py-4 text-xs">
+                        <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-slate-600 text-xs font-mono break-all">{{ row.staffEmail }}</td>
+                        <td class="px-3 sm:px-4 py-2.5 sm:py-3 font-bold text-blue-700">{{ row.currentlyAssignedDisputes ?? row.activeSessions }}</td>
+                        <td class="px-3 sm:px-4 py-2.5 sm:py-3 font-semibold text-indigo-700">{{ row.callCentreDisputesLogged ?? 0 }}</td>
+                        <td class="px-3 sm:px-4 py-2.5 sm:py-3 font-bold text-emerald-700">{{ row.resolvedDisputesCount ?? 0 }}</td>
+                        <td class="px-3 sm:px-4 py-2.5 sm:py-3 font-semibold text-slate-800">{{ row.distinctDisputesHandled }}</td>
+                        <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-xs">
                           <span class="font-bold text-emerald-700">{{ row.completedSessions }}</span> completed /
                           <span class="font-bold text-blue-700">{{ row.activeSessions }}</span> active
                         </td>
-                        <td class="px-5 py-4 font-mono font-bold text-slate-900">{{ row.totalDurationSeconds }} sec</td>
-                        <td class="px-5 py-4 font-mono font-bold text-capi-blue">{{ row.averageDurationSeconds }} sec / session</td>
+                        <td class="px-3 sm:px-4 py-2.5 sm:py-3 font-mono font-bold text-slate-900 whitespace-nowrap">{{ row.totalDurationSeconds }} sec</td>
+                        <td class="px-3 sm:px-4 py-2.5 sm:py-3 font-mono font-bold text-capi-blue whitespace-nowrap">{{ row.averageDurationSeconds }} sec / session</td>
                       </tr>
                     }
                   </tbody>
@@ -449,42 +427,42 @@ import {
 
           @if (productivity && productivity.recentSessions.length > 0) {
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div class="px-6 py-4 border-b border-slate-100">
+              <div class="px-4 sm:px-6 py-4 border-b border-slate-100">
                 <h3 class="text-base font-bold text-slate-900">Recorded StaffWorkSession Entries</h3>
               </div>
               <div class="overflow-x-auto">
                 <table class="w-full text-xs text-left">
                   <thead class="bg-slate-50 uppercase text-slate-500 border-b border-slate-200">
                     <tr>
-                      <th class="px-5 py-3">Session ID</th>
-                      <th class="px-5 py-3">Dispute Reference</th>
-                      <th class="px-5 py-3">Investigator</th>
-                      <th class="px-5 py-3">Assignment Source</th>
-                      <th class="px-5 py-3">Outcome / Status</th>
-                      <th class="px-5 py-3">Started At</th>
-                      <th class="px-5 py-3">Completed At</th>
-                      <th class="px-5 py-3">Duration</th>
+                      <th class="px-3 sm:px-4 py-2.5">Session ID</th>
+                      <th class="px-3 sm:px-4 py-2.5">Dispute Reference</th>
+                      <th class="px-3 sm:px-4 py-2.5">Investigator</th>
+                      <th class="px-3 sm:px-4 py-2.5">Assignment Source</th>
+                      <th class="px-3 sm:px-4 py-2.5">Outcome / Status</th>
+                      <th class="px-3 sm:px-4 py-2.5">Started At</th>
+                      <th class="px-3 sm:px-4 py-2.5">Completed At</th>
+                      <th class="px-3 sm:px-4 py-2.5">Duration</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-slate-100">
                     @for (s of productivity.recentSessions; track s.sessionId) {
                       <tr class="hover:bg-slate-50">
-                        <td class="px-5 py-3 font-mono">#{{ s.sessionId }}</td>
-                        <td class="px-5 py-3 font-mono font-bold">{{ s.disputeReference }}</td>
-                        <td class="px-5 py-3">
+                        <td class="px-3 sm:px-4 py-2.5 font-mono">#{{ s.sessionId }}</td>
+                        <td class="px-3 sm:px-4 py-2.5 font-mono font-bold whitespace-nowrap">{{ s.disputeReference }}</td>
+                        <td class="px-3 sm:px-4 py-2.5">
                           <div class="font-semibold text-slate-900">{{ s.staffFullName || s.staffEmail }}</div>
-                          <div class="text-[11px] text-slate-500 font-mono">{{ s.staffEmail }}</div>
+                          <div class="text-[11px] text-slate-500 font-mono break-all">{{ s.staffEmail }}</div>
                         </td>
-                        <td class="px-5 py-3 font-medium text-slate-700">{{ s.assignmentSource || 'Supervisor / Admin Assignment' }}</td>
-                        <td class="px-5 py-3">
+                        <td class="px-3 sm:px-4 py-2.5 font-medium text-slate-700">{{ s.assignmentSource || 'Supervisor / Admin Assignment' }}</td>
+                        <td class="px-3 sm:px-4 py-2.5">
                           <div class="font-semibold text-slate-800">{{ s.sessionOutcome || (s.completedAt ? 'Completed' : 'Active (In Review)') }}</div>
                           @if (s.disputeStatus) {
                             <span [class]="statusBadge(s.disputeStatus)" class="inline-block mt-1 scale-90 origin-left">{{ s.disputeStatus }}</span>
                           }
                         </td>
-                        <td class="px-5 py-3 whitespace-nowrap">{{ s.startedAt | date:'medium' }}</td>
-                        <td class="px-5 py-3 whitespace-nowrap">{{ s.completedAt ? (s.completedAt | date:'medium') : 'In Progress' }}</td>
-                        <td class="px-5 py-3 font-mono font-bold"
+                        <td class="px-3 sm:px-4 py-2.5 whitespace-nowrap">{{ s.startedAt | date:'medium' }}</td>
+                        <td class="px-3 sm:px-4 py-2.5 whitespace-nowrap">{{ s.completedAt ? (s.completedAt | date:'medium') : 'In Progress' }}</td>
+                        <td class="px-3 sm:px-4 py-2.5 font-mono font-bold whitespace-nowrap"
                             [class]="s.totalDurationSeconds !== null ? 'text-emerald-700' : 'text-blue-700'">
                           {{ s.totalDurationSeconds !== null ? s.totalDurationSeconds + 's' : ((s.elapsedDurationSeconds ?? 1) + 's (Active)') }}
                         </td>
@@ -503,7 +481,7 @@ import {
         <div class="space-y-6">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Panel 1: Role Catalog & Add/Update Role -->
-            <div id="admin-roles-panel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5">
+            <div id="admin-roles-panel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-5">
               <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
                   <h2 class="text-lg font-bold text-slate-900">Operational Roles Catalog ({{ roles.length }})</h2>
@@ -556,7 +534,6 @@ import {
                     >
                       <option value="STAFF">STAFF (Internal Investigator / Agent)</option>
                       <option value="ADMIN">ADMIN (Supervisor / System Admin)</option>
-                      <option value="AFFILIATE">AFFILIATE (External Clearing / Merchant Partner)</option>
                     </select>
                   </div>
                   <div>
@@ -568,8 +545,6 @@ import {
                       class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white outline-none focus:ring-2 focus:ring-capi-blue"
                     >
                       <option value="INTERNAL_CAPI">INTERNAL_CAPI</option>
-                      <option value="PARTNER_BANKSERV">PARTNER_BANKSERV</option>
-                      <option value="PARTNER_MERCHANT">PARTNER_MERCHANT</option>
                     </select>
                   </div>
                 </div>
@@ -625,7 +600,7 @@ import {
             </div>
 
             <!-- Panel 2: Add / Update Staff Member & Account -->
-            <div id="admin-staff-form-panel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5">
+            <div id="admin-staff-form-panel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-5">
               <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
                   <h2 class="text-lg font-bold text-slate-900">
@@ -705,7 +680,6 @@ import {
                     >
                       <option value="STAFF">STAFF</option>
                       <option value="ADMIN">ADMIN</option>
-                      <option value="AFFILIATE">AFFILIATE</option>
                       <option value="CUSTOMER">CUSTOMER</option>
                     </select>
                   </div>
@@ -718,8 +692,6 @@ import {
                       class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white outline-none focus:ring-2 focus:ring-capi-blue"
                     >
                       <option value="INTERNAL_CAPI">INTERNAL_CAPI</option>
-                      <option value="PARTNER_BANKSERV">PARTNER_BANKSERV</option>
-                      <option value="PARTNER_MERCHANT">PARTNER_MERCHANT</option>
                       <option value="CUSTOMER">CUSTOMER</option>
                     </select>
                   </div>
@@ -791,12 +763,12 @@ import {
 
           <!-- Panel 3: Portal Users Table -->
           <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h2 class="text-lg font-bold text-slate-900">Portal Users, Staff Roles &amp; Fraud Lock Status</h2>
                 <p class="text-xs text-slate-500">Review active staff members, update assigned roles/domains, or unlock fraud-flagged accounts.</p>
               </div>
-              <button type="button" (click)="loadAll()" class="text-xs text-capi-blue font-semibold hover:underline">
+              <button type="button" (click)="loadAll()" class="text-xs text-capi-blue font-semibold hover:underline whitespace-nowrap">
                 Refresh Directory
               </button>
             </div>
@@ -804,24 +776,24 @@ import {
               <table class="w-full text-sm text-left">
                 <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
                   <tr>
-                    <th class="px-6 py-3">Full Name &amp; Contact</th>
-                    <th class="px-6 py-3">Email</th>
-                    <th class="px-6 py-3">Role, Title &amp; Domain</th>
-                    <th class="px-6 py-3">Security State</th>
-                    <th class="px-6 py-3 text-right">Actions</th>
+                    <th class="px-3 sm:px-5 py-3">Full Name &amp; Contact</th>
+                    <th class="px-3 sm:px-5 py-3">Email</th>
+                    <th class="px-3 sm:px-5 py-3">Role, Title &amp; Domain</th>
+                    <th class="px-3 sm:px-5 py-3">Security State</th>
+                    <th class="px-3 sm:px-5 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                   @for (u of users; track u.id) {
                     <tr class="hover:bg-slate-50/70">
-                      <td class="px-6 py-4">
+                      <td class="px-3 sm:px-5 py-3">
                         <div class="font-semibold text-slate-900">{{ u.fullName }}</div>
                         @if (u.phoneNumber) {
                           <div class="text-xs font-mono text-slate-500 mt-0.5">{{ u.phoneNumber }}</div>
                         }
                       </td>
-                      <td class="px-6 py-4 text-slate-600 font-mono text-xs">{{ u.email }}</td>
-                      <td class="px-6 py-4 text-xs">
+                      <td class="px-3 sm:px-5 py-3 text-slate-600 font-mono text-xs break-all">{{ u.email }}</td>
+                      <td class="px-3 sm:px-5 py-3 text-xs">
                         <div class="flex flex-wrap items-center gap-1.5">
                           <span class="px-2 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">{{ u.role }}</span>
                           <span class="font-mono text-slate-600">{{ u.userDomain }}</span>
@@ -830,7 +802,7 @@ import {
                           <div class="text-xs text-slate-600 mt-1 font-medium">{{ u.partnerInstitution }}</div>
                         }
                       </td>
-                      <td class="px-6 py-4">
+                      <td class="px-3 sm:px-5 py-3">
                         @if (u.isLocked) {
                           <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800">
                             LOCKED ({{ u.lockedReason || 'Fraud Alert' }})
@@ -841,12 +813,12 @@ import {
                           </span>
                         }
                       </td>
-                      <td class="px-6 py-4 text-right whitespace-nowrap">
-                        <div class="inline-flex items-center gap-2">
+                      <td class="px-3 sm:px-5 py-3 text-right">
+                        <div class="inline-flex flex-wrap justify-end items-center gap-2">
                           <button
                             type="button"
                             (click)="startEditUser(u)"
-                            class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition"
+                            class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition whitespace-nowrap"
                           >
                             Edit / Update Role
                           </button>
@@ -854,7 +826,7 @@ import {
                             <button
                               type="button"
                               (click)="unlockAccount(u)"
-                              class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+                              class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold whitespace-nowrap"
                             >
                               Unlock Account
                             </button>
@@ -938,7 +910,7 @@ export class AdminDashboardComponent implements OnInit {
 
   loadAll(): void {
     this.api.getAdminUsers().subscribe((u) => {
-      this.users = u;
+      this.users = u.filter((user) => user.role !== 'AFFILIATE');
       this.syncDefaultAssignees();
     });
     this.loadRoles();
@@ -1092,19 +1064,13 @@ export class AdminDashboardComponent implements OnInit {
     if (tab === 'PRODUCTIVITY') this.loadProductivity();
     if (tab === 'USERS') {
       this.loadRoles();
-      this.api.getAdminUsers().subscribe((u) => (this.users = u));
+      this.api.getAdminUsers().subscribe((u) => (this.users = u.filter((user) => user.role !== 'AFFILIATE')));
     }
   }
 
   onRoleFormBaseRoleChange(): void {
     if (this.roleForm.baseRole === 'STAFF' || this.roleForm.baseRole === 'ADMIN') {
       this.roleForm.defaultDomain = 'INTERNAL_CAPI';
-    } else if (
-      this.roleForm.baseRole === 'AFFILIATE' &&
-      this.roleForm.defaultDomain !== 'PARTNER_BANKSERV' &&
-      this.roleForm.defaultDomain !== 'PARTNER_MERCHANT'
-    ) {
-      this.roleForm.defaultDomain = 'PARTNER_BANKSERV';
     }
   }
 
@@ -1179,12 +1145,6 @@ export class AdminDashboardComponent implements OnInit {
   onStaffRoleChange(): void {
     if (this.userForm.role === 'STAFF' || this.userForm.role === 'ADMIN') {
       this.userForm.userDomain = 'INTERNAL_CAPI';
-    } else if (
-      this.userForm.role === 'AFFILIATE' &&
-      this.userForm.userDomain !== 'PARTNER_BANKSERV' &&
-      this.userForm.userDomain !== 'PARTNER_MERCHANT'
-    ) {
-      this.userForm.userDomain = 'PARTNER_BANKSERV';
     } else if (this.userForm.role === 'CUSTOMER') {
       this.userForm.userDomain = 'CUSTOMER';
     }
@@ -1285,33 +1245,6 @@ export class AdminDashboardComponent implements OnInit {
     }
   }
 
-  quickReject(d: DisputeSummary): void {
-    this.api
-      .updateStatus(d.id, 'REJECTED', 'Rejected by Supervisor: Insufficient supporting affidavit provided within SLA.')
-      .subscribe((updated) => {
-        this.bannerMessage = `Dispute ${updated.disputeReference} transitioned to REJECTED.`;
-        this.loadAll();
-      });
-  }
-
-  quickResolve(d: DisputeSummary): void {
-    this.api
-      .updateStatus(d.id, 'RESOLVED', 'Resolved by Supervisor after investigation review.')
-      .subscribe((updated) => {
-        this.bannerMessage = `Dispute ${updated.disputeReference} transitioned to RESOLVED.`;
-        this.loadAll();
-      });
-  }
-
-  assignBankserv(d: DisputeSummary): void {
-    this.api
-      .delegateDispute(d.id, 'PARTNER_BANKSERV', 'Assigned by Supervisor to BankservAfrica external investigators.')
-      .subscribe((updated) => {
-        this.bannerMessage = `Dispute ${updated.disputeReference} assigned to PARTNER_BANKSERV.`;
-        this.loadAll();
-      });
-  }
-
   exportCsv(): void {
     this.api.exportAuditCsv().subscribe((blob) => {
       const url = window.URL.createObjectURL(blob);
@@ -1330,7 +1263,7 @@ export class AdminDashboardComponent implements OnInit {
   unlockAccount(u: UserProfile): void {
     this.api.unlockUser(u.id).subscribe(() => {
       this.bannerMessage = `Unlocked account ${u.email}.`;
-      this.api.getAdminUsers().subscribe((users) => (this.users = users));
+      this.api.getAdminUsers().subscribe((users) => (this.users = users.filter((user) => user.role !== 'AFFILIATE')));
     });
   }
 

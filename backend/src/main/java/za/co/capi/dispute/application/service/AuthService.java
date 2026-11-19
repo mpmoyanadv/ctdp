@@ -109,20 +109,6 @@ public class AuthService {
                 UserDomain.INTERNAL_CAPI,
                 "Assigns and reassigns disputes, manages staff and roles, exports immutable audit CSVs, and reviews productivity."
         ));
-        registerDefaultRole(new StaffRoleDefinitionDto(
-                "PARTNER_BANKSERV_INVESTIGATOR",
-                "BankservAfrica Clearing Investigator",
-                UserRole.AFFILIATE,
-                UserDomain.PARTNER_BANKSERV,
-                "External clearing partner investigator for delegated PayShap and interbank rails (POPIA PII-masked)."
-        ));
-        registerDefaultRole(new StaffRoleDefinitionDto(
-                "PARTNER_MERCHANT_INVESTIGATOR",
-                "Merchant Acquirer Investigator",
-                UserRole.AFFILIATE,
-                UserDomain.PARTNER_MERCHANT,
-                "External merchant acquirer investigator for POS and e-commerce chargeback disputes (POPIA PII-masked)."
-        ));
     }
 
     private void registerDefaultRole(StaffRoleDefinitionDto roleDef) {

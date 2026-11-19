@@ -8,14 +8,14 @@ import { AuthService } from '../../core/services/auth.service';
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <div class="max-w-xl mx-auto px-4 py-14">
+    <div class="max-w-xl mx-auto px-3 sm:px-4 py-6 sm:py-12">
       <div class="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-        <div class="bg-red-700 text-white px-7 py-6">
+        <div class="bg-red-700 text-white px-5 sm:px-7 py-5 sm:py-6">
           <p class="text-xs font-bold uppercase tracking-wider text-red-200 mb-1">Capi Instant Fraud Shield</p>
           <h1 class="text-2xl font-bold">Emergency Account Lockdown</h1>
         </div>
 
-        <div class="p-7">
+        <div class="p-5 sm:p-7">
           @if (processing) {
             <div class="py-8 text-center">
               <p class="text-base font-semibold text-slate-800">{{ processingMessage }}</p>

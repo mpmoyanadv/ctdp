@@ -2,7 +2,7 @@
 
 Full-stack transaction dispute management application built with **Java 21**, **Spring Boot 3.3.5**, **PostgreSQL 16**, **Redis 7**, **Apache Kafka 3.8**, and **Angular 18**.
 
-Customers can view settled account transactions across payment rails (`CARD_POS`, `ONLINE_ECOMMERCE`, `PAYSHAP`, `DEBIT_ORDER`), submit disputes with supporting evidence, filter active vs. historic disputed transactions, and re-open rejected claims with full case lineage. Internal staff, external clearing partners, and admins handle investigation, escalation, PII-masked delegation, auditing, and turnaround reporting.
+Customers can view settled account transactions across payment rails (`CARD_POS`, `ONLINE_ECOMMERCE`, `PAYSHAP`, `DEBIT_ORDER`), submit disputes with supporting evidence, filter active vs. historic disputed transactions, and re-open rejected claims with full case lineage. Internal staff and supervisors handle Call Centre KYC intake (SA ID & Foreign Passports), case assignment, investigation, escalation, staff/role administration, auditing, and turnaround reporting (while backend API/POPIA compatibility for external clearing records remains intact, external delegation buttons have been removed from the UI).
 
 ---
 
@@ -36,7 +36,7 @@ flowchart LR
   - Messaging & Config: `KafkaEventService`, `KafkaTopicConfig`, `DataSeeder`, `OpenApiConfig`
 - **Frontend (`frontend/src/app`):**
   - Core: `AuthService`, `PortalApiService`, `authGuard`, `roleGuard`, `authInterceptor`, `portal.models.ts`
-  - Feature Components: `login`, `fraud-report`, `reset-password-verify`, `customer`, `staff`, `affiliate`, `admin`, `dispute-detail`, `omnichannel`
+  - Feature Components: `login`, `fraud-report`, `reset-password-verify`, `customer`, `customer-disputes`, `staff`, `admin`, `dispute-detail`, `omnichannel` (plus `affiliate` retained for route/API compatibility with no active UI delegation links)
 
 ---
 
@@ -72,30 +72,54 @@ transactions_dispute_portal/
 
 ## Key Features
 
-- **Customer Transactions & Historic Dispute View:** View settled transactions with inline dispute status badges and filter logged disputes by `All`, `Active`, or `Historic / Closed` (`RESOLVED`, `REFUNDED`, `REJECTED`).
-- **Dispute Lifecycle & Optimistic Concurrency Control:** State machine enforced centrally by `DisputeTransitionPolicy` across `LOGGED`, `IN_REVIEW`, `PENDING_CUSTOMER_ACTION`, `PENDING_EXTERNAL_REVIEW`, `ESCALATED`, and immutable terminal states (`RESOLVED`, `REFUNDED`, `REJECTED`). `Dispute` uses `@Version` (`V3` migration) so concurrent `/claim` or transition requests return `409 Conflict` instead of double-claiming. Rejected disputes can be re-opened with an `original_dispute_id` lineage link.
+- **Customer Transactions & Dedicated Disputes View:** View settled transactions with inline dispute status badges and manage logged disputes on `/customer/disputes`, filtering by `All`, `Active`, or `Historic / Closed` (`RESOLVED`, `REFUNDED`, `REJECTED`).
+- **Dispute Lifecycle, Supervisor Assignment & Optimistic Concurrency Control:** State machine enforced centrally by `DisputeTransitionPolicy` across `LOGGED`, `IN_REVIEW`, `PENDING_CUSTOMER_ACTION`, `PENDING_EXTERNAL_REVIEW`, `ESCALATED`, and immutable terminal states (`RESOLVED`, `REFUNDED`, `REJECTED`). `Dispute` uses `@Version` (`V3` migration) so concurrent `/claim` or transition requests return `409 Conflict` instead of double-claiming. Rejected disputes can be re-opened with an `original_dispute_id` lineage link. Supervisors assign or reassign disputes to internal staff via `POST /api/v1/admin/disputes/{id}/assign`, and `DisputeService` enforces investigator assignment before claiming/updating (`ensureStaffAssignedToDispute`). External delegation (**Bankserv**), **Resolve**, and **Reject** quick action buttons and partner role options have been removed from the UI (`/admin`, `/disputes/:id`, `/staff`, `/login`) and from `AuthService.initDefaultRoles()`, while backend `/delegate` and POPIA masking endpoints remain in place for API/test backward compatibility.
 - **Multi-File Evidence Uploads:** Supports up to 5 files per dispute (`PDF`, `PNG`, `JPG`, max 5 MB each) with magic-byte validation, `nosniff` download headers, and SHA-256 checksums stored per attachment. Uploads and notes are blocked once a dispute reaches a terminal state.
-- **IDOR Prevention & Immutable Audit Trail:** Cross-customer or unauthorized cross-domain access attempts fail with `403 Forbidden` and persist a `UNAUTHORIZED_ACCESS_ATTEMPT` audit record via `AuditService` (`PROPAGATION_REQUIRES_NEW`), exportable as sanitized CSV.
-- **POPIA Partner PII Masking:** Disputes delegated to `PARTNER_BANKSERV` or `PARTNER_MERCHANT` automatically mask customer PII (`SA ID`, `phone`, `account number`, `email`, `fullName`) and redact phone, SA ID, and account identifiers inside free-text fields (`reason`, notes, `contactChannelMetadata`) for `AFFILIATE` callers.
+- **IDOR Prevention & Immutable Audit Trail:** Cross-customer or unauthorized cross-domain access attempts fail with `403 Forbidden` and persist an `UNAUTHORIZED_ACCESS_ATTEMPT` audit record via `AuditService` (`PROPAGATION_REQUIRES_NEW`), exportable as sanitized CSV.
+- **POPIA Partner PII Masking (Backend API Compatibility):** When queried via `AFFILIATE` callers on backend APIs (`PARTNER_BANKSERV` / `PARTNER_MERCHANT`), customer PII (`SA ID`, `phone`, `account number`, `email`, `fullName`) and free-text identifiers (`reason`, notes, `contactChannelMetadata`) are automatically masked/redacted.
 - **Brute-Force Protection, Fraud Lockdown & OTP Recovery:** `LoginRateLimiterService` locks an account for 15 minutes (`900s`) after 5 consecutive failures and returns `429 Too Many Requests` after 20 failures per IP in 5 minutes (`300s`). `AuthService` returns uniform `401 Unauthorized` payloads and equalized BCrypt timing across unknown, locked, and wrong-password attempts, and resets counters on success. Customer logins email a one-click fraud alert (`It Wasn't Me`) that revokes active JWTs via `tokenVersion` and emails a cryptographic 6-digit OTP (never in email subjects or logs).
 - **Redis Idempotency Locking:** `POST /api/v1/disputes` uses atomic Redis `SET NX EX` locks via `IdempotencyLockService` to prevent duplicate submissions on retries (`409 Conflict`).
 - **After-Commit Kafka & Email Delivery:** `KafkaEventService` and `NotificationEmailService` dispatch events and HTML-escaped emails via `@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)` so rolled-back transactions never leak side effects, with bounded 5-second SMTP timeouts.
-- **Staff-Only Call Centre KYC & Omnichannel Dispute Intake:** Accessible exclusively to internal `STAFF` and `ADMIN` operators at `/simulator` (removed from customer navigation and dashboards). Requires verifying the calling customer's SA ID number plus at least two security/credit-bureau checks (`POST /api/v1/omnichannel/verify-customer`) before unlocking the caller's transactions and logging a Voice Call or SMS/WhatsApp dispute on their behalf (`internalOnly = true` channel notes and no raw phone numbers in metadata or note bodies).
-- **SQL-Aggregated Staff Productivity Tracking:** `ProductivityService` and `StaffWorkSessionRepository` aggregate investigator work sessions directly in SQL and fetch attachment counts in a single grouped query (`DisputeAttachmentRepository`).
+- **Staff-Only Call Centre KYC & Omnichannel Dispute Intake:** Accessible exclusively to internal `STAFF` and `ADMIN` operators at `/simulator` (removed from customer navigation and dashboards). Supports looking up both South African ID holders and foreign passport customers (`ZW4829104`, `NG7739201`) via `GET /api/v1/omnichannel/lookup-customer`, verifying caller identity plus at least two security/credit-bureau checks (`POST /api/v1/omnichannel/verify-customer`) which collapses the Step 1 KYC verification panel once **Verified** is pressed, logging failed checks via `POST /api/v1/omnichannel/not-verified` (`CALLER_KYC_*` audit events), and logging/auto-assigning Voice Call or SMS/WhatsApp disputes on the customer's behalf (`internalOnly = true` channel notes and no raw phone numbers in metadata or note bodies).
+- **Admin Staff, Roles & SQL-Aggregated Productivity Tracking:** Supervisors manage staff members and roles (`GET/POST /api/v1/admin/users`, `PUT /api/v1/admin/users/{id}`, `GET/POST /api/v1/admin/roles`, `PUT /api/v1/admin/roles/{roleCode}`) across the 4 default internal roles. `ProductivityService`, `StaffWorkSessionRepository`, and `DisputeAttachmentRepository` calculate investigator productivity directly in SQL from `StaffWorkSession` timers measured between `IN_REVIEW` claim and escalation/resolution.
+- **Role-Based Header Themes & Responsive UI:** The application header banner automatically reflects the signed-in role (`ADMIN` displays greyish silver, `STAFF` displays black, and `CUSTOMER` preserves `bg-capi-blue`), and layouts across `styles.css` and 11 Angular views adapt across mobile, tablet, laptop, and desktop viewports.
+
+---
+
+## Apache Kafka Event-Driven Architecture & Scenarios
+
+Apache Kafka (`capi-dispute-kafka`, Apache Kafka 3.8 KRaft) is actively integrated into the backend via [`KafkaTopicConfig.java`](backend/src/main/java/za/co/capi/dispute/infrastructure/messaging/KafkaTopicConfig.java) and [`KafkaEventService.java`](backend/src/main/java/za/co/capi/dispute/infrastructure/messaging/KafkaEventService.java):
+
+- **Topics (`3` partitions, `1` replica each):**
+  1. `capi.dispute.lifecycle.events`
+  2. `capi.security.audit.events`
+  3. `capi.notification.alert.events`
+- **Transactional Publishing & Consumer Group:**
+  - Events are dispatched after database commit via `@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)` so rolled-back database operations never emit side effects (`deliveryGuarantee = "BEST_EFFORT_AT_MOST_ONCE"`).
+  - `KafkaEventService` consumes all three topics under consumer group `capi-dispute-portal-consumer-group`, buffering up to `200` recent event envelopes for inspection via `GET /api/v1/admin/events/kafka-stream`.
+
+| Kafka Topic | Producer Service | Triggered Scenarios / Event Types |
+| :--- | :--- | :--- |
+| `capi.dispute.lifecycle.events` | `DisputeService` | `DISPUTE_CREATED` (customer self-service or Call Centre intake), `DISPUTE_CLAIMED` (`IN_REVIEW`), `DISPUTE_STATUS_CHANGED`, `DISPUTE_ESCALATED`, `DISPUTE_REOPENED_LINKED` (re-opening a rejected dispute), and `DISPUTE_DELEGATED_EXTERNAL` (backend `/delegate` API compatibility). |
+| `capi.security.audit.events` | `AuditService` (`persistAndPublishAudit`) | Mirrors persisted security and governance audit records, including `CALLER_KYC_*` events (all 4 lookup/verified/unverified KYC events in `REQUIRES_NEW_SECURITY_EVENTS`), `LOGIN_*` / `OTP_*` auth events, `UNAUTHORIZED_ACCESS_ATTEMPT`, `ACCOUNT_LOCKED_FRAUD_REPORTED`, `IDEMPOTENCY_DUPLICATE_PREVENTED`, `ATTACHMENT_UPLOADED`, `DISPUTE_NOTE_ADDED`, `AUDIT_LOG_CSV_EXPORTED`, and `ADMIN_*` actions. |
+| `capi.notification.alert.events` | `NotificationEmailService` | `CUSTOMER_LOGIN_SECURITY_ALERT`, `ACCOUNT_LOCKED_FRAUD_OTP_DISPATCHED`, `SUPERVISOR_ESCALATION_ALERT`, and `OMNICHANNEL_DISPUTE_CONFIRMATION_PHONE_CALL` (plus `_SMS` / `_WHATSAPP` channel confirmation variants). |
 
 ---
 
 ## Pre-Seeded Demo Accounts (`demo` profile)
 
-When `SPRING_PROFILES_ACTIVE=demo` (enabled in `.env.example` for quick local evaluation), `DataSeeder` seeds 5 users (all with password `Password123!`), 7 sample transactions, 1 active PayShap dispute (`DSP-2026-10042`), and 1 historic refunded dispute (`DSP-2026-09811`):
+When `SPRING_PROFILES_ACTIVE=demo` (enabled in `.env.example` for quick local evaluation), `DataSeeder` seeds **8 users** (all with password `Password123!`), **13 settled sample transactions** across 4 customers, **1 active PayShap dispute** (`DSP-2026-10042`, `LOGGED`), and **1 historic refunded dispute** (`DSP-2026-09811`, `REFUNDED`, assigned to `Sipho Ndlovu` with a `1860s` `StaffWorkSession`):
 
-| Email | Role | Domain |
-| :--- | :--- | :--- |
-| `customer@capi.test` | `CUSTOMER` | `CUSTOMER` |
-| `customer2@capi.test` | `CUSTOMER` | `CUSTOMER` |
-| `staff@capi.test` | `STAFF` | `INTERNAL_CAPI` |
-| `affiliate@bankserv.test` | `AFFILIATE` | `PARTNER_BANKSERV` |
-| `admin@capi.test` | `ADMIN` | `INTERNAL_CAPI` |
+| Email | Name / ID or Passport | Role | Domain / Title |
+| :--- | :--- | :--- | :--- |
+| `customer@capi.test` | Thabo Mokoena (SA ID `8501015800082`) | `CUSTOMER` | `CUSTOMER` |
+| `customer2@capi.test` | Naledi Dlamini (SA ID `9104120842087`) | `CUSTOMER` | `CUSTOMER` |
+| `customer3@capi.test` | Tendai Moyo (Foreign Passport `ZW4829104`) | `CUSTOMER` | `CUSTOMER` |
+| `customer4@capi.test` | Chidinma Okafor (Foreign Passport `NG7739201`) | `CUSTOMER` | `CUSTOMER` |
+| `staff@capi.test` | Sipho Ndlovu | `STAFF` | `INTERNAL_CAPI` / `Call Centre KYC & Intake Agent` |
+| `staff2@capi.test` | Zanele Mbeki | `STAFF` | `INTERNAL_CAPI` / `Dispute Investigator` |
+| `affiliate@bankserv.test` | Johan van Wyk | `AFFILIATE` | `PARTNER_BANKSERV` *(DB/API compatibility only; hidden from UI)* |
+| `admin@capi.test` | Lerato Khumalo | `ADMIN` | `INTERNAL_CAPI` / `Supervisor / System Administrator` |
 
 ---
 
@@ -218,16 +242,24 @@ GitHub Actions CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs th
 | `POST /api/v1/disputes/{id}/claim` | `STAFF`, `ADMIN` | Claim dispute (`IN_REVIEW`) with `@Version` optimistic lock and start work session timer |
 | `POST /api/v1/disputes/{id}/notes` | Authenticated | Add note (`requiresCustomerReply` transitions via `DisputeTransitionPolicy`) |
 | `POST /api/v1/disputes/{id}/escalate` | `CUSTOMER`, `STAFF`, `ADMIN` | Escalate dispute to supervisor queue |
-| `POST /api/v1/disputes/{id}/delegate` | `STAFF`, `ADMIN` | Delegate dispute to `PARTNER_BANKSERV` or `PARTNER_MERCHANT` |
+| `POST /api/v1/disputes/{id}/delegate` | `STAFF`, `ADMIN` | Backend API compatibility endpoint to delegate dispute externally *(UI buttons removed)* |
 | `PATCH /api/v1/disputes/{id}/status` | `STAFF`, `ADMIN` | Transition dispute status |
 | `POST /api/v1/disputes/{id}/reopen` | `CUSTOMER` | Re-open a `REJECTED` dispute as a linked case |
 | `GET /api/v1/admin/audit-logs` | `ADMIN` | View paginated audit logs (`page`, `size`, optional `eventType`) |
 | `GET /api/v1/admin/audit-logs/export` | `ADMIN` | Export audit logs as CSV (bounded to 10,000 most recent rows) |
-| `GET /api/v1/admin/reports/productivity` | `ADMIN` | View SQL-aggregated investigator turnaround metrics |
+| `GET /api/v1/admin/reports/productivity` | `ADMIN` | View SQL-aggregated investigator turnaround metrics from `StaffWorkSession` timers |
 | `GET /api/v1/admin/events/kafka-stream` | `ADMIN` | Inspect Kafka topics/events and Redis lock status |
+| `GET /api/v1/admin/users` | `ADMIN` | List staff and portal user accounts |
+| `POST /api/v1/admin/users` | `ADMIN` | Create a new staff/user account |
+| `PUT /api/v1/admin/users/{id}` | `ADMIN` | Update an existing staff/user account and role assignment |
 | `POST /api/v1/admin/users/{id}/unlock` | `ADMIN` | Unlock a locked user account |
-| `POST /api/v1/admin/disputes/{id}/assign` | `ADMIN` | Assign/reassign dispute to investigator or partner domain |
-| `POST /api/v1/omnichannel/verify-customer` | `STAFF`, `ADMIN` | Verify calling customer via SA ID + >=2 security/credit-bureau checks and return transactions |
+| `GET /api/v1/admin/roles` | `ADMIN` | List internal staff role definitions |
+| `POST /api/v1/admin/roles` | `ADMIN` | Create a new internal staff role |
+| `PUT /api/v1/admin/roles/{roleCode}` | `ADMIN` | Update an existing internal staff role |
+| `POST /api/v1/admin/disputes/{id}/assign` | `ADMIN` | Assign/reassign dispute to an internal investigator |
+| `GET /api/v1/omnichannel/lookup-customer` | `STAFF`, `ADMIN` | Look up calling customer by SA ID or Foreign Passport prior to verification |
+| `POST /api/v1/omnichannel/verify-customer` | `STAFF`, `ADMIN` | Verify calling customer via SA ID or Foreign Passport + >=2 security/credit-bureau checks and return transactions |
+| `POST /api/v1/omnichannel/not-verified` | `STAFF`, `ADMIN` | Record failed Call Centre KYC verification (`CALLER_KYC_*` audit trail) |
 | `POST /api/v1/omnichannel/sms-webhook` | `STAFF`, `ADMIN` | Simulate inbound SMS/WhatsApp dispute intake on customer's behalf (strict phone + transaction required) |
 | `POST /api/v1/omnichannel/voice-call` | `STAFF`, `ADMIN` | Simulate Call Centre / IVR voice call dispute intake on customer's behalf (strict phone + transaction required) |
 

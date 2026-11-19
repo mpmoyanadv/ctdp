@@ -465,7 +465,7 @@ class DisputePortalIntegrationTest {
         mockMvc.perform(get("/api/v1/admin/roles")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(6)));
+                .andExpect(jsonPath("$.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(4)));
 
         mockMvc.perform(post("/api/v1/admin/roles")
                         .header("Authorization", "Bearer " + adminToken)

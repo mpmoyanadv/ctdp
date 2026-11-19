@@ -15,16 +15,16 @@ import {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div class="w-full max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6">
       <!-- Top Welcome Banner -->
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 class="text-2xl font-bold text-slate-900">Global One Retail Transactions &amp; Disputes</h1>
           <p class="text-sm text-slate-500 mt-1">
             Select any unrecognized transaction below to log a formal dispute and attach supporting PDF, PNG, or JPG evidence.
           </p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
           <a id="active-disputes-link"
              [routerLink]="['/customer/disputes']"
              [queryParams]="{ filter: 'ACTIVE' }"
@@ -49,7 +49,7 @@ import {
             <div class="text-lg font-bold mt-0.5">
               Reference: {{ created.disputeReference }} &mdash; Status: <span class="px-2 py-0.5 rounded bg-emerald-200 text-emerald-900 text-xs">{{ created.status }}</span>
             </div>
-            <div class="text-xs text-emerald-800 mt-1 font-mono">Case UUID: {{ created.id }} &bull; Attachments: {{ created.attachments.length }}</div>
+            <div class="text-xs text-emerald-800 mt-1 font-mono break-all">Case UUID: {{ created.id }} &bull; Attachments: {{ created.attachments.length }}</div>
           </div>
           <a [routerLink]="['/disputes', created.id]"
              class="px-4 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition whitespace-nowrap">
@@ -60,7 +60,7 @@ import {
 
       <!-- Log Dispute Form Modal/Drawer Panel -->
       @if (selectedTx) {
-        <div id="log-dispute-panel" class="bg-white rounded-2xl shadow-lg border-2 border-capi-blue p-6">
+        <div id="log-dispute-panel" class="bg-white rounded-2xl shadow-lg border-2 border-capi-blue p-4 sm:p-6">
           <div class="flex items-start justify-between mb-4 pb-4 border-b border-slate-100">
             <div>
               <span class="text-xs font-bold uppercase tracking-wider text-capi-blue">New Transaction Dispute</span>
@@ -201,40 +201,40 @@ import {
 
       <!-- Recent Transactions Feed -->
       <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-2">
           <h2 class="text-lg font-bold text-slate-900">Recent Account Transactions</h2>
-          <span class="text-xs text-slate-500">{{ transactions.length }} settled items</span>
+          <span class="text-xs text-slate-500 whitespace-nowrap">{{ transactions.length }} settled items</span>
         </div>
 
         <div class="overflow-x-auto">
           <table class="w-full text-sm text-left">
             <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
               <tr>
-                <th class="px-6 py-3">Reference</th>
-                <th class="px-6 py-3">Date &amp; Time</th>
-                <th class="px-6 py-3">Merchant / Description</th>
-                <th class="px-6 py-3">Payment Rail</th>
-                <th class="px-6 py-3">Location</th>
-                <th class="px-6 py-3">Dispute Status</th>
-                <th class="px-6 py-3 text-right">Amount</th>
-                <th class="px-6 py-3 text-right">Action</th>
+                <th class="px-3 sm:px-4 py-3">Reference</th>
+                <th class="px-3 sm:px-4 py-3">Date &amp; Time</th>
+                <th class="px-3 sm:px-4 py-3">Merchant / Description</th>
+                <th class="px-3 sm:px-4 py-3">Payment Rail</th>
+                <th class="px-3 sm:px-4 py-3">Location</th>
+                <th class="px-3 sm:px-4 py-3">Dispute Status</th>
+                <th class="px-3 sm:px-4 py-3 text-right">Amount</th>
+                <th class="px-3 sm:px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
               @for (tx of transactions; track tx.id) {
                 <tr class="hover:bg-slate-50/80 transition">
-                  <td class="px-6 py-4 font-mono text-xs text-slate-600">{{ tx.transactionReference }}</td>
-                  <td class="px-6 py-4 text-xs text-slate-500">{{ tx.transactedAt | date:'medium' }}</td>
-                  <td class="px-6 py-4 font-semibold text-slate-900">{{ tx.merchantName }}</td>
-                  <td class="px-6 py-4">
-                    <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                  <td class="px-3 sm:px-4 py-3 font-mono text-xs text-slate-600 whitespace-nowrap">{{ tx.transactionReference }}</td>
+                  <td class="px-3 sm:px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{{ tx.transactedAt | date:'medium' }}</td>
+                  <td class="px-3 sm:px-4 py-3 font-semibold text-slate-900">{{ tx.merchantName }}</td>
+                  <td class="px-3 sm:px-4 py-3">
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 whitespace-nowrap">
                       {{ tx.paymentRail }}
                     </span>
                   </td>
-                  <td class="px-6 py-4 text-slate-500">{{ tx.location }}</td>
-                  <td class="px-6 py-4">
+                  <td class="px-3 sm:px-4 py-3 text-slate-500">{{ tx.location }}</td>
+                  <td class="px-3 sm:px-4 py-3">
                     @if (getLatestDisputeForTransaction(tx.id); as txDispute) {
-                      <a [routerLink]="['/disputes', txDispute.id]" class="inline-flex items-center gap-1.5 hover:underline">
+                      <a [routerLink]="['/disputes', txDispute.id]" class="inline-flex flex-wrap items-center gap-1.5 hover:underline">
                         <span [class]="statusBadgeClass(txDispute.status)">{{ txDispute.status }}</span>
                         <span class="text-xs font-mono text-slate-500">({{ txDispute.disputeReference }})</span>
                       </a>
@@ -242,12 +242,12 @@ import {
                       <span class="text-xs text-slate-400">No dispute</span>
                     }
                   </td>
-                  <td class="px-6 py-4 text-right font-bold text-slate-900">R {{ tx.amount | number:'1.2-2' }}</td>
-                  <td class="px-6 py-4 text-right">
+                  <td class="px-3 sm:px-4 py-3 text-right font-bold text-slate-900 whitespace-nowrap">R {{ tx.amount | number:'1.2-2' }}</td>
+                  <td class="px-3 sm:px-4 py-3 text-right">
                     <button
                       type="button"
                       (click)="openLogDispute(tx)"
-                      class="px-3.5 py-1.5 rounded-lg bg-capi-red hover:bg-red-700 text-white text-xs font-semibold transition"
+                      class="px-3.5 py-1.5 rounded-lg bg-capi-red hover:bg-red-700 text-white text-xs font-semibold transition whitespace-nowrap"
                     >
                       Log Dispute
                     </button>

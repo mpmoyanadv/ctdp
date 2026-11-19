@@ -10,10 +10,10 @@ import { AuthService } from '../../core/services/auth.service';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-10">
+    <div class="min-h-[calc(100vh-56px)] flex items-center justify-center px-3 sm:px-6 py-4 sm:py-8">
       <div class="max-w-4xl w-full grid grid-cols-1 lg:grid-cols-5 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
         <!-- Brand Left Panel -->
-        <div class="lg:col-span-2 bg-gradient-to-br from-capi-blue via-capi-light to-capi-dark text-white p-8 flex flex-col justify-between">
+        <div class="lg:col-span-2 bg-gradient-to-br from-capi-blue via-capi-light to-capi-dark text-white p-5 sm:p-7 lg:p-8 flex flex-col justify-between">
           <div>
             <div class="inline-flex items-center gap-2 bg-white/15 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-6">
               Global One Digital Security
@@ -22,29 +22,26 @@ import { AuthService } from '../../core/services/auth.service';
               Cap Trans Dsp Ptl
             </h1>
             <p class="text-blue-100 text-sm leading-relaxed">
-              Log unauthorized card or PayShap disputes, upload cryptographic SHA-256 evidence, and track real-time investigation progress across internal &amp; partner rails.
+              Log unauthorized card or PayShap disputes, upload cryptographic SHA-256 evidence, and track real-time investigation progress.
             </p>
           </div>
 
-          <div class="mt-8 pt-6 border-t border-white/20">
+          <div class="mt-6 lg:mt-8 pt-5 border-t border-white/20">
             <p class="text-xs uppercase tracking-wider text-blue-200 font-semibold mb-2">Demo Accounts (Quick Fill)</p>
-            <div class="space-y-1.5 text-xs">
-              <button type="button" (click)="quickFill('customer@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-1.5 text-xs">
+              <button type="button" (click)="quickFill('customer@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition truncate">
                 Customer 1: customer&#64;capi.test
               </button>
-              <button type="button" (click)="quickFill('customer2@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
+              <button type="button" (click)="quickFill('customer2@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition truncate">
                 Customer 2: customer2&#64;capi.test
               </button>
-              <button type="button" (click)="quickFill('staff@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
+              <button type="button" (click)="quickFill('staff@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition truncate">
                 Internal Staff 1: staff&#64;capi.test
               </button>
-              <button type="button" (click)="quickFill('staff2@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
+              <button type="button" (click)="quickFill('staff2@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition truncate">
                 Internal Staff 2: staff2&#64;capi.test
               </button>
-              <button type="button" (click)="quickFill('affiliate@bankserv.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
-                Bankserv Affiliate: affiliate&#64;bankserv.test
-              </button>
-              <button type="button" (click)="quickFill('admin@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition">
+              <button type="button" (click)="quickFill('admin@capi.test')" class="w-full text-left px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 transition truncate">
                 System Admin: admin&#64;capi.test
               </button>
             </div>
@@ -52,7 +49,7 @@ import { AuthService } from '../../core/services/auth.service';
         </div>
 
         <!-- Sign-In Form -->
-        <div class="lg:col-span-3 p-8 md:p-10 flex flex-col justify-center">
+        <div class="lg:col-span-3 p-5 sm:p-7 lg:p-8 flex flex-col justify-center">
           <h2 class="text-2xl font-bold text-slate-900 mb-1">Sign In to Your Profile</h2>
           <p class="text-sm text-slate-500 mb-6">Enter your banking or investigator credentials below.</p>
 
@@ -116,7 +113,7 @@ import { AuthService } from '../../core/services/auth.service';
             </button>
           </form>
 
-          <div class="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <div class="mt-6 pt-5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs text-slate-500">
             <span>Account locked after fraud alert?</span>
             <a routerLink="/reset-password-verify" class="text-capi-blue font-semibold hover:underline">
               Verify 6-Digit OTP &amp; Reset Password

@@ -17,9 +17,9 @@ import {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+    <div class="w-full max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
       <!-- Header -->
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span class="text-xs font-bold uppercase tracking-wider text-capi-blue">Staff Operations &bull; Call Centre &amp; Omnichannel Desk</span>
           <h1 class="text-2xl font-bold text-slate-900 mt-0.5">Caller KYC Verification &amp; Assisted Dispute Intake</h1>
@@ -35,7 +35,7 @@ import {
 
       <!-- STEP 1: SA ID Capture -> Load Customer Details -> Verified / Unverified -->
       @if (!verification) {
-        <div id="caller-kyc-panel" class="bg-white rounded-2xl shadow-sm border-2 p-6 space-y-5"
+        <div id="caller-kyc-panel" class="bg-white rounded-2xl shadow-sm border-2 p-4 sm:p-6 space-y-5"
              [class]="kycError ? 'border-red-300' : 'border-capi-blue/40'">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <div>
@@ -248,7 +248,7 @@ import {
       @if (verification; as verifiedData) {
         <!-- STEP 2: Verified Customer Transactions -->
         <div id="verified-customer-transactions" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <div class="flex items-center gap-2">
                 <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">STEP 2</span>
@@ -274,36 +274,36 @@ import {
             <table class="w-full text-sm text-left">
               <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
                 <tr>
-                  <th class="px-5 py-3">Reference</th>
-                  <th class="px-5 py-3">Date &amp; Time</th>
-                  <th class="px-5 py-3">Merchant / Description</th>
-                  <th class="px-5 py-3">Transaction Type</th>
-                  <th class="px-5 py-3">Amount</th>
-                  <th class="px-5 py-3">Status</th>
-                  <th class="px-5 py-3 text-right">Assist</th>
+                  <th class="px-3 sm:px-4 py-2.5 sm:py-3">Reference</th>
+                  <th class="px-3 sm:px-4 py-2.5 sm:py-3">Date &amp; Time</th>
+                  <th class="px-3 sm:px-4 py-2.5 sm:py-3">Merchant / Description</th>
+                  <th class="px-3 sm:px-4 py-2.5 sm:py-3">Transaction Type</th>
+                  <th class="px-3 sm:px-4 py-2.5 sm:py-3">Amount</th>
+                  <th class="px-3 sm:px-4 py-2.5 sm:py-3">Status</th>
+                  <th class="px-3 sm:px-4 py-2.5 sm:py-3 text-right">Assist</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
                 @for (tx of verifiedData.transactions; track tx.id) {
                   <tr [class]="selectedTx?.id === tx.id ? 'bg-blue-50/70' : 'hover:bg-slate-50 transition'">
-                    <td class="px-5 py-3 font-mono text-xs font-bold text-slate-800">{{ tx.transactionReference }}</td>
-                    <td class="px-5 py-3 text-xs text-slate-600">{{ tx.transactedAt | date:'medium' }}</td>
-                    <td class="px-5 py-3">
+                    <td class="px-3 sm:px-4 py-2.5 sm:py-3 font-mono text-xs font-bold text-slate-800 whitespace-nowrap">{{ tx.transactionReference }}</td>
+                    <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-xs text-slate-600 whitespace-nowrap">{{ tx.transactedAt | date:'medium' }}</td>
+                    <td class="px-3 sm:px-4 py-2.5 sm:py-3">
                       <div class="font-semibold text-slate-900">{{ tx.merchantName }}</div>
                       <div class="text-xs text-slate-500">{{ tx.location }}</div>
                     </td>
-                    <td class="px-5 py-3">
+                    <td class="px-3 sm:px-4 py-2.5 sm:py-3">
                       <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs font-mono">{{ tx.paymentRail }}</span>
                     </td>
-                    <td class="px-5 py-3 font-bold text-slate-900">R {{ tx.amount | number:'1.2-2' }}</td>
-                    <td class="px-5 py-3 text-xs font-semibold text-emerald-700">{{ tx.status || 'SETTLED' }}</td>
-                    <td class="px-5 py-3 text-right">
+                    <td class="px-3 sm:px-4 py-2.5 sm:py-3 font-bold text-slate-900 whitespace-nowrap">R {{ tx.amount | number:'1.2-2' }}</td>
+                    <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-xs font-semibold text-emerald-700">{{ tx.status || 'SETTLED' }}</td>
+                    <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-right">
                       <button
                         type="button"
                         (click)="selectTransactionForDispute(tx)"
                         [class]="selectedTx?.id === tx.id
-                          ? 'px-3 py-1.5 rounded-lg bg-capi-blue text-white text-xs font-semibold'
-                          : 'px-3 py-1.5 rounded-lg bg-capi-red hover:bg-red-700 text-white text-xs font-semibold transition'"
+                          ? 'px-3 py-1.5 rounded-lg bg-capi-blue text-white text-xs font-semibold whitespace-nowrap'
+                          : 'px-3 py-1.5 rounded-lg bg-capi-red hover:bg-red-700 text-white text-xs font-semibold transition whitespace-nowrap'"
                       >
                         {{ selectedTx?.id === tx.id ? 'Selected' : 'Log Dispute on Behalf' }}
                       </button>
@@ -329,8 +329,8 @@ import {
           }
 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div id="capture-dispute-panel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5">
-                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div id="capture-dispute-panel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-5">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                   <div>
                     <h2 class="text-lg font-bold text-slate-900">Capture Dispute Details (On Behalf of Customer)</h2>
                     <p class="text-xs text-slate-500">Matches online customer dispute capture with Transaction Type &amp; Location.</p>
@@ -511,9 +511,9 @@ import {
                 </form>
               </div>
 
-              <div class="bg-slate-900 rounded-2xl p-6 text-white shadow-xl flex flex-col justify-between space-y-5">
+              <div class="bg-slate-900 rounded-2xl p-4 sm:p-6 text-white shadow-xl flex flex-col justify-between space-y-5">
                 <div class="space-y-4">
-                  <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-4">
                     <div>
                       <div class="text-xs uppercase tracking-wider text-blue-300 font-bold">Fraud &amp; Disputes Voice Desk</div>
                       <div class="text-lg font-bold mt-0.5">0860 10 20 43 &mdash; Assisted Intake</div>
@@ -523,7 +523,7 @@ import {
                     </span>
                   </div>
 
-                  <div class="p-4 rounded-xl bg-slate-800/80 border border-slate-700 text-xs space-y-1.5">
+                  <div class="p-4 rounded-xl bg-slate-800/80 border border-slate-700 text-xs space-y-1.5 break-words">
                     <div><strong>KYC Check:</strong> {{ verifiedData.verificationSummary }}</div>
                     <div><strong>Transaction Type:</strong> {{ voicePaymentRail }}</div>
                     <div><strong>Merchant:</strong> {{ voiceMerchantName || 'Not specified' }}</div>
@@ -539,7 +539,7 @@ import {
                       <div class="text-emerald-200 font-mono">
                         Status: {{ lastResult.dispute.status }} &bull; Assigned: {{ lastResult.dispute.assignedUserName || 'You' }} &bull; Attachments: {{ lastResult.dispute.attachments.length }}
                       </div>
-                      <pre class="whitespace-pre-wrap font-mono text-[11px] bg-slate-950/70 p-3 rounded-lg text-slate-200 border border-slate-800">{{ lastResult.channelTranscript }}</pre>
+                      <pre class="whitespace-pre-wrap break-words overflow-x-auto font-mono text-[11px] bg-slate-950/70 p-3 rounded-lg text-slate-200 border border-slate-800">{{ lastResult.channelTranscript }}</pre>
                       <div class="pt-1">
                         <a [routerLink]="['/disputes', lastResult.dispute.id]"
                            class="inline-block px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold">

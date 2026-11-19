@@ -10,9 +10,9 @@ import { DisputeSummary } from '../../core/models/portal.models';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+    <div class="w-full max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
       <!-- Page Header -->
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <span class="text-xs font-bold uppercase tracking-wider text-capi-blue">Dispute Case History &amp; Outcomes</span>
           <h1 class="text-2xl font-bold text-slate-900 mt-0.5">My Logged &amp; Historic Disputed Transactions</h1>
@@ -39,7 +39,7 @@ import { DisputeSummary } from '../../core/models/portal.models';
 
       <!-- Disputes Table Card -->
       <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
             <div class="relative w-full sm:w-80">
               <input
@@ -108,32 +108,32 @@ import { DisputeSummary } from '../../core/models/portal.models';
             <table class="w-full text-sm text-left">
               <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
                 <tr>
-                  <th class="px-6 py-3">Dispute Ref</th>
-                  <th class="px-6 py-3">Merchant &amp; Rail</th>
-                  <th class="px-6 py-3">Category &amp; Outcome</th>
-                  <th class="px-6 py-3">Amount</th>
-                  <th class="px-6 py-3">Status</th>
-                  <th class="px-6 py-3">Logged / Resolved</th>
-                  <th class="px-6 py-3">Evidence</th>
-                  <th class="px-6 py-3 text-right">Details</th>
+                  <th class="px-3 sm:px-4 py-3">Dispute Ref</th>
+                  <th class="px-3 sm:px-4 py-3">Merchant &amp; Rail</th>
+                  <th class="px-3 sm:px-4 py-3">Category &amp; Outcome</th>
+                  <th class="px-3 sm:px-4 py-3">Amount</th>
+                  <th class="px-3 sm:px-4 py-3">Status</th>
+                  <th class="px-3 sm:px-4 py-3">Logged / Resolved</th>
+                  <th class="px-3 sm:px-4 py-3">Evidence</th>
+                  <th class="px-3 sm:px-4 py-3 text-right">Details</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
                 @for (d of filteredDisputes; track d.id) {
                   <tr class="hover:bg-slate-50/80 transition">
-                    <td class="px-6 py-4">
-                      <div class="font-mono font-bold text-slate-900">{{ d.disputeReference }}</div>
+                    <td class="px-3 sm:px-4 py-3">
+                      <div class="font-mono font-bold text-slate-900 whitespace-nowrap">{{ d.disputeReference }}</div>
                       @if (d.originalDisputeReference) {
                         <div class="text-xs text-indigo-700 font-medium mt-0.5">
                           Linked to {{ d.originalDisputeReference }}
                         </div>
                       }
                     </td>
-                    <td class="px-6 py-4">
+                    <td class="px-3 sm:px-4 py-3">
                       <div class="font-medium text-slate-800">{{ d.merchantName }}</div>
                       <div class="text-xs text-slate-500">{{ d.paymentRail }} &bull; {{ d.sourceChannel || 'WEB_PORTAL' }}</div>
                     </td>
-                    <td class="px-6 py-4">
+                    <td class="px-3 sm:px-4 py-3">
                       <div class="text-xs font-semibold text-slate-700">{{ d.category }}</div>
                       @if (d.resolutionSummary) {
                         <div class="text-xs text-slate-500 mt-0.5 max-w-xs truncate" [title]="d.resolutionSummary">
@@ -145,20 +145,20 @@ import { DisputeSummary } from '../../core/models/portal.models';
                         </div>
                       }
                     </td>
-                    <td class="px-6 py-4 font-semibold text-slate-900">R {{ d.amount | number:'1.2-2' }}</td>
-                    <td class="px-6 py-4">
+                    <td class="px-3 sm:px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">R {{ d.amount | number:'1.2-2' }}</td>
+                    <td class="px-3 sm:px-4 py-3">
                       <span [class]="statusBadgeClass(d.status)">{{ d.status }}</span>
                     </td>
-                    <td class="px-6 py-4 text-xs text-slate-500">
+                    <td class="px-3 sm:px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
                       <div>Logged: {{ d.createdAt | date:'shortDate' }}</div>
                       @if (d.resolvedAt) {
                         <div class="text-emerald-700 font-medium">Closed: {{ d.resolvedAt | date:'shortDate' }}</div>
                       }
                     </td>
-                    <td class="px-6 py-4 text-xs text-slate-600">{{ d.attachmentCount }} file(s)</td>
-                    <td class="px-6 py-4 text-right">
+                    <td class="px-3 sm:px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{{ d.attachmentCount }} file(s)</td>
+                    <td class="px-3 sm:px-4 py-3 text-right">
                       <a [routerLink]="['/disputes', d.id]"
-                         class="px-3.5 py-1.5 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition inline-block">
+                         class="px-3.5 py-1.5 rounded-lg bg-capi-blue hover:bg-capi-dark text-white text-xs font-semibold transition inline-block whitespace-nowrap">
                         View Case
                       </a>
                     </td>
